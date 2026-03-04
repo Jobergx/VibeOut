@@ -18,7 +18,9 @@
 </head>
 <body class="h-screen overflow-hidden flex flex-col">
 
-    <div id="debug-log" class="fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 text-slate-400">Status: Initializing...</div>
+    <div id="debug-log" class="fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 text-slate-400">
+        Status: Initializing...
+    </div>
 
     <header id="game-header" class="hidden p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center mt-6">
         <div id="scoreboard-list" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
@@ -32,39 +34,38 @@
             <div id="entry-form" class="bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6 shadow-2xl">
                 <input id="player-name" type="text" placeholder="YOUR NAME" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-bold mb-3 outline-none">
                 <input id="room-input" type="text" placeholder="ROOM CODE" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-mono mb-4 outline-none">
-                <button id="entry-btn" onclick="joinOrCreateRoom()" class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl transition-all shadow-lg">ENTER GAME</button>
+                <button id="entry-btn" onclick="joinOrCreateRoom()" class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl transition-all">ENTER GAME</button>
             </div>
 
-            <div id="waiting-area" class="hidden screen-fade bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6">
+            <div id="waiting-area" class="hidden bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6">
                 <div id="room-code-display" class="text-4xl font-mono font-bold text-[#3b82f6] mb-4">----</div>
                 <div id="lobby-player-list" class="flex flex-wrap justify-center gap-2 mb-4"></div>
-                <button id="host-start-btn" onclick="hostStartGame()" class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl shadow-lg">START GAME</button>
+                <button id="host-start-btn" onclick="hostStartGame()" class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl">START GAME</button>
                 <p id="min-players-note" class="text-[10px] text-amber-500 font-bold uppercase mt-2">Waiting for at least 3 players...</p>
             </div>
         </section>
 
         <section id="screen-input" class="hidden-screen screen-fade w-full max-w-md">
             <div class="bg-slate-900 p-6 rounded-3xl mb-6 border-2 border-[#3b82f6]/30 text-center">
-                <h2 class="text-[#3b82f6] text-[10px] font-bold uppercase mb-2">Prompt</h2>
-                <p id="prompt-text" class="text-2xl font-bold leading-tight">Loading word...</p>
+                <h2 class="text-[#3b82f6] text-[10px] font-bold uppercase mb-2">PROMPT</h2>
+                <p id="prompt-text" class="text-2xl font-bold leading-tight">Loading...</p>
             </div>
-            <textarea id="answer-input" oninput="validateInput()" placeholder="Exactly 5 words..." class="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 text-white text-lg h-36 resize-none outline-none mb-2"></textarea>
-            <div id="word-count-label" class="text-[10px] font-bold text-slate-500 uppercase mb-4 px-2">Words: 0 / 5</div>
-            <button id="submit-btn" onclick="submitAnswer()" disabled class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl opacity-50 shadow-lg">SUBMIT</button>
-            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic text-xs uppercase animate-pulse">Vibe sent. Waiting for others...</div>
+            <textarea id="answer-input" oninput="validateInput()" placeholder="Describe it in exactly 5 words..." class="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 text-white text-lg h-36 resize-none outline-none mb-2"></textarea>
+            <div id="word-count-label" class="text-[10px] font-bold text-slate-500 uppercase px-2 mb-4">Words: 0 / 5</div>
+            <button id="submit-btn" onclick="submitAnswer()" disabled class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl opacity-50">SUBMIT VIBE</button>
+            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic text-xs uppercase animate-pulse">Waiting for other players...</div>
         </section>
 
         <section id="screen-voting" class="hidden-screen screen-fade w-full max-w-md">
-            <h2 class="text-center text-xl font-bold mb-6 italic">Who is the <span class="text-[#f59e0b]">Odd One Out?</span></h2>
+            <h2 class="text-center text-xl font-bold mb-6 italic">Identify the <span class="text-[#f59e0b]">Odd One Out</span></h2>
             <div id="voting-list" class="flex flex-col gap-3"></div>
         </section>
 
         <section id="screen-results" class="hidden-screen screen-fade w-full max-w-md text-center">
-            <h2 class="text-slate-400 text-[10px] font-bold mb-2 uppercase tracking-widest">The Odd One was</h2>
+            <h2 class="text-slate-400 text-[10px] font-bold mb-2 uppercase tracking-widest text-xs">The Odd One was</h2>
             <div id="revealed-name" class="text-5xl font-black text-[#f59e0b] uppercase mb-8">----</div>
-            <button id="next-round-btn" onclick="handleNextRound()" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-xl shadow-xl">Next Round</button>
+            <button id="next-round-btn" onclick="handleNextRound()" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-xl shadow-xl">NEXT ROUND</button>
         </section>
-
     </main>
 
     <script>
@@ -79,24 +80,36 @@
             appId: "1:784876378174:web:dec7a58f1013cb593b596f"
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        function setStatus(msg, color = "text-slate-400") {
+            const el = document.getElementById('debug-log');
+            if(el) { el.innerText = "Status: " + msg; el.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`; }
+        }
+
+        // Init
+        try {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.database();
+            db.ref(".info/connected").on("value", snap => {
+                if (snap.val() === true) setStatus("Online: Europe Server", "text-[#3b82f6]");
+                else setStatus("Connecting to Belgium...", "text-amber-500");
+            });
+        } catch (e) { setStatus("Error: " + e.message, "text-red-500"); }
 
         if(!localStorage.getItem('vuid')) localStorage.setItem('vuid', 'u' + Math.random().toString(36).substr(2, 7));
-        let localPlayer = { id: localStorage.getItem('vuid'), name: "", score: 0 };
+        let localPlayer = { id: localStorage.getItem('vuid'), name: "" };
         let roomRef = null;
+        let lastKnownState = null;
 
         const prompts = [
-            {g:"Hospital",o:"Hotel"},{g:"Library",o:"Museum"},
-            {g:"Pizza",o:"Taco"},{g:"Elephant",o:"Dino"},
-            {g:"Coffee",o:"Energy Drink"},{g:"Church",o:"Castle"}
+            {g:"Hospital",o:"Hotel"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"},
+            {g:"Coffee",o:"Red Bull"},{g:"Library",o:"Church"},{g:"Elephant",o:"Dino"}
         ];
 
-        // --- LOBBY LOGIC ---
+        // --- LOBBY ---
         function joinOrCreateRoom() {
             const name = document.getElementById('player-name').value.trim().toUpperCase();
             let code = document.getElementById('room-input').value.trim().toUpperCase();
-            if(!name) return alert("Enter name");
+            if(!name) return alert("Name required");
             localPlayer.name = name;
 
             if(!code) {
@@ -109,68 +122,81 @@
 
         function connect(code) {
             roomRef = db.ref('rooms/' + code);
-            roomRef.child('players/' + localPlayer.id).update({
-                id: localPlayer.id, name: localPlayer.name, score: localPlayer.score, answer: "", vote: ""
-            });
+            roomRef.child('players/' + localPlayer.id).update({ id: localPlayer.id, name: localPlayer.name, score: 0, answer: "", vote: "" });
             roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
 
             document.getElementById('entry-form').classList.add('hidden');
             document.getElementById('waiting-area').classList.remove('hidden');
             document.getElementById('room-code-display').innerText = code;
-
             roomRef.on('value', snap => { if(snap.val()) sync(snap.val()); });
         }
 
         function sync(data) {
             const players = Object.values(data.players || {});
-            document.getElementById('current-count').innerText = players.length;
+            const count = players.length;
+            
+            // Lobby Update
+            document.getElementById('current-count').innerText = count;
             document.getElementById('lobby-player-list').innerHTML = players.map(p => `
                 <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
                     ${p.name} ${p.id === data.hostId ? '👑' : ''}
                 </div>
             `).join('');
 
-            // UI Screen Controller
-            const state = data.gameState || "LOBBY";
-            if (state === "LOBBY") {
-                showScreen('screen-lobby');
-                const isHost = data.hostId === localPlayer.id;
-                document.getElementById('host-start-btn').classList.toggle('hidden', !isHost || players.length < 3);
-            }
-            if (state === "INPUT") {
-                const isOdd = localPlayer.id === data.oddOneId;
-                const p = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
-                document.getElementById('prompt-text').innerText = `Describe ${p} in 5 words.`;
-                showScreen('screen-input');
-            }
-            if (state === "VOTING") {
-                renderVoting(data);
-                showScreen('screen-voting');
-            }
-            if (state === "RESULTS") {
-                document.getElementById('revealed-name').innerText = data.players[data.oddOneId].name;
-                showScreen('screen-results');
-            }
-            
-            // Scoreboard Sync
-            document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => b.score - a.score).map(p => `
+            // Scoreboard
+            document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => (b.score||0)-(a.score||0)).map(p => `
                 <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
                     <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
                     <div class="text-xl font-black">${p.score || 0}</div>
                 </div>
             `).join('');
+
+            // State Guard (Prevents resetting UI unnecessarily)
+            const newState = data.gameState || "LOBBY";
+            if (newState !== lastKnownState) {
+                lastKnownState = newState;
+                handleStateChange(data);
+            }
+
+            // Continuous checks
+            if (newState === "LOBBY") {
+                const isHost = data.hostId === localPlayer.id;
+                document.getElementById('host-start-btn').classList.toggle('hidden', !isHost || count < 3);
+            }
+        }
+
+        function handleStateChange(data) {
+            const state = data.gameState;
+            if(state === "LOBBY") showScreen('screen-lobby');
+            if(state === "INPUT") {
+                const isOdd = localPlayer.id === data.oddOneId;
+                const p = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
+                document.getElementById('prompt-text').innerText = `Describe ${p} in exactly 5 words.`;
+                resetInputUI();
+                showScreen('screen-input');
+            }
+            if(state === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
+            if(state === "RESULTS") {
+                const oddP = data.players[data.oddOneId];
+                document.getElementById('revealed-name').innerText = oddP ? oddP.name : "Unknown";
+                showScreen('screen-results');
+            }
+        }
+
+        function resetInputUI() {
+            document.getElementById('answer-input').value = "";
+            document.getElementById('submit-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('waiting-msg').classList.add('hidden');
+            document.getElementById('word-count-label').innerText = "Words: 0 / 5";
         }
 
         // --- GAME ACTIONS ---
         function hostStartGame() {
             roomRef.child('players').once('value', snap => {
-                const pObj = snap.val();
-                const ids = Object.keys(pObj);
+                const ids = Object.keys(snap.val());
                 const updates = {};
-                ids.forEach(id => {
-                    updates[`players/${id}/answer`] = "";
-                    updates[`players/${id}/vote`] = "";
-                });
+                ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
                 updates.gameState = "INPUT";
                 updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
                 updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
@@ -181,27 +207,25 @@
 
         function validateInput() {
             const val = document.getElementById('answer-input').value.trim();
-            const count = val === "" ? 0 : val.split(/\s+/).length;
-            document.getElementById('word-count-label').innerText = `Words: ${count} / 5`;
+            const words = val === "" ? [] : val.split(/\s+/);
+            document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
             const btn = document.getElementById('submit-btn');
-            btn.disabled = count !== 5;
-            btn.style.opacity = count === 5 ? "1" : "0.5";
+            btn.disabled = words.length !== 5;
+            btn.style.opacity = words.length === 5 ? "1" : "0.5";
         }
 
         function submitAnswer() {
-            const text = document.getElementById('answer-input').value.trim();
-            roomRef.child('players/' + localPlayer.id).update({ answer: text });
+            const val = document.getElementById('answer-input').value.trim();
+            roomRef.child('players/' + localPlayer.id).update({ answer: val });
             document.getElementById('submit-btn').classList.add('hidden');
             document.getElementById('waiting-msg').classList.remove('hidden');
 
-            roomRef.once('value', snap => {
-                const data = snap.val();
-                if (data.hostId === localPlayer.id) {
-                    const checkInterval = setInterval(() => {
-                        roomRef.child('players').once('value', s => {
-                            const ps = Object.values(s.val());
-                            if (ps.every(p => p.answer !== "")) {
-                                clearInterval(checkInterval);
+            roomRef.once('value', s => {
+                if(s.val().hostId === localPlayer.id) {
+                    const int = setInterval(() => {
+                        roomRef.child('players').once('value', ps => {
+                            if(Object.values(ps.val()).every(p => p.answer !== "")) {
+                                clearInterval(int);
                                 roomRef.update({ gameState: "VOTING" });
                             }
                         });
@@ -214,43 +238,43 @@
             const list = document.getElementById('voting-list');
             list.innerHTML = "";
             data.shuffled.forEach(id => {
-                if(id === localPlayer.id) return; // Don't vote for self
+                if(id === localPlayer.id) return;
                 const p = data.players[id];
                 const btn = document.createElement('button');
                 btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
                 btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
                 btn.onclick = () => {
                     roomRef.child('players/' + localPlayer.id).update({ vote: id });
-                    list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast...</p>";
-                    if (data.hostId === localPlayer.id) checkVotes(data.oddOneId);
+                    list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
+                    if(data.hostId === localPlayer.id) checkVotes(data.oddOneId);
                 };
                 list.appendChild(btn);
             });
         }
 
         function checkVotes(oddId) {
-            const checkV = setInterval(() => {
+            const int = setInterval(() => {
                 roomRef.child('players').once('value', s => {
                     const ps = Object.values(s.val());
-                    if (ps.every(p => p.vote !== "")) {
-                        clearInterval(checkV);
-                        calculateScores(s.val(), oddId);
+                    if(ps.every(p => p.vote !== "")) {
+                        clearInterval(int);
+                        calculateFinalScores(s.val(), oddId);
                     }
                 });
             }, 1000);
         }
 
-        function calculateScores(players, oddId) {
+        function calculateFinalScores(players, oddId) {
             const ids = Object.keys(players);
             const updates = {};
             ids.forEach(id => {
                 let pts = 0;
-                if (id === oddId) {
+                if(id === oddId) {
                     pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
-                } else if (players[id].vote === oddId) {
+                } else if(players[id].vote === oddId) {
                     pts = 1;
                 }
-                if (pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
+                if(pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
             });
             updates.gameState = "RESULTS";
             roomRef.update(updates);
@@ -261,25 +285,18 @@
             screens.forEach(s => document.getElementById(s).classList.add('hidden-screen'));
             document.getElementById(id).classList.remove('hidden-screen');
             document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
-            
-            // RESET INPUT UI IF WE ARE IN INPUT SCREEN
-            if(id === 'screen-input') {
-                document.getElementById('answer-input').value = "";
-                document.getElementById('submit-btn').classList.remove('hidden');
-                document.getElementById('submit-btn').disabled = true;
-                document.getElementById('submit-btn').style.opacity = "0.5";
-                document.getElementById('waiting-msg').classList.add('hidden');
-                document.getElementById('word-count-label').innerText = "Words: 0 / 5";
-            }
         }
 
         function handleNextRound() {
-            roomRef.once('value', snap => {
-                if(localPlayer.id === snap.val().hostId) hostStartGame();
-            });
+            roomRef.once('value', s => { if(localPlayer.id === s.val().hostId) hostStartGame(); });
         }
 
         lucide.createIcons();
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const r = urlParams.get('room');
+            if (r) document.getElementById('room-input').value = r.toUpperCase();
+        };
     </script>
 </body>
 </html>
