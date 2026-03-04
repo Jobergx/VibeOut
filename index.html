@@ -69,234 +69,261 @@
     </main>
 
     <script>
-        // --- CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
-            authDomain: "vibeout-d814c.firebaseapp.com",
-            databaseURL: "https://vibeout-d814c-default-rtdb.europe-west1.firebasedatabase.app/",
-            projectId: "vibeout-d814c",
-            storageBucket: "vibeout-d814c.firebasestorage.app",
-            messagingSenderId: "784876378174",
-            appId: "1:784876378174:web:dec7a58f1013cb593b596f"
-        };
+       // --- 1. CONFIG ---
+const firebaseConfig = {
+    apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
+    authDomain: "vibeout-d814c.firebaseapp.com",
+    databaseURL: "https://vibeout-d814c-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "vibeout-d814c",
+    storageBucket: "vibeout-d814c.firebasestorage.app",
+    messagingSenderId: "784876378174",
+    appId: "1:784876378174:web:dec7a58f1013cb593b596f"
+};
 
-        function setStatus(msg, color = "text-slate-400") {
-            const el = document.getElementById('debug-log');
-            if(el) { el.innerText = "Status: " + msg; el.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`; }
+function setStatus(msg, color = "text-slate-400") {
+    const el = document.getElementById('debug-log');
+    if(el) { el.innerText = "Status: " + msg; el.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`; }
+}
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// Persistent ID so you stay Host even on refresh
+if(!localStorage.getItem('vuid')) localStorage.setItem('vuid', 'u' + Math.random().toString(36).substr(2, 7));
+let localPlayer = { id: localStorage.getItem('vuid'), name: "" };
+let roomRef = null;
+let lastKnownState = null;
+
+const prompts = [
+    {g:"Hospital",o:"Hotel"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"},
+    {g:"Coffee",o:"Red Bull"},{g:"Library",o:"Church"},{g:"Elephant",o:"Dino"}
+];
+
+// --- 2. LOBBY ENTRY ---
+
+function joinOrCreateRoom() {
+    const name = document.getElementById('player-name').value.trim().toUpperCase();
+    let code = document.getElementById('room-input').value.trim().toUpperCase();
+    if(!name) return alert("Enter name");
+    localPlayer.name = name;
+
+    if(!code) {
+        // HOSTING
+        code = Math.random().toString(36).substring(2, 6).toUpperCase();
+        db.ref('rooms/' + code).set({ 
+            gameState: "LOBBY", 
+            hostId: localPlayer.id,
+            createdAt: firebase.database.ServerValue.TIMESTAMP 
+        }).then(() => connect(code));
+    } else {
+        // JOINING
+        db.ref('rooms/' + code).once('value', s => s.exists() ? connect(code) : alert("Room not found"));
+    }
+}
+
+function connect(code) {
+    roomRef = db.ref('rooms/' + code);
+    
+    // Add player to DB
+    roomRef.child('players/' + localPlayer.id).update({
+        id: localPlayer.id,
+        name: localPlayer.name,
+        score: 0,
+        answer: "",
+        vote: ""
+    });
+
+    roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
+
+    document.getElementById('entry-form').classList.add('hidden');
+    document.getElementById('waiting-area').classList.remove('hidden');
+    document.getElementById('room-code-display').innerText = code;
+
+    roomRef.on('value', snap => {
+        const data = snap.val();
+        if(data) sync(data);
+    });
+}
+
+function sync(data) {
+    const players = Object.values(data.players || {});
+    const count = players.length;
+    
+    // 1. Update Lobby UI
+    document.getElementById('current-count').innerText = count;
+    document.getElementById('lobby-player-list').innerHTML = players.map(p => `
+        <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
+            ${p.name} ${p.id === data.hostId ? '👑' : ''}
+        </div>
+    `).join('');
+
+    // 2. THE HOST CHECK
+    const isMeHost = (data.hostId === localPlayer.id);
+    const startBtn = document.getElementById('host-start-btn');
+    const note = document.getElementById('min-players-note');
+
+    if (isMeHost) {
+        startBtn.classList.remove('hidden');
+        // If 3+ players, enable the button. Otherwise, keep it visible but disabled.
+        if (count >= 3) {
+            startBtn.disabled = false;
+            startBtn.style.opacity = "1";
+            startBtn.innerText = "START GAME";
+            note.classList.add('hidden');
+        } else {
+            startBtn.disabled = false; // ENABLED FOR TESTING - Remove this line later!
+            startBtn.style.opacity = "0.6";
+            startBtn.innerText = "DEBUG START (Min 3 recommended)";
+            note.classList.remove('hidden');
         }
+    } else {
+        startBtn.classList.add('hidden');
+        note.classList.remove('hidden');
+    }
 
-        // Init
-        try {
-            firebase.initializeApp(firebaseConfig);
-            var db = firebase.database();
-            db.ref(".info/connected").on("value", snap => {
-                if (snap.val() === true) setStatus("Online: Europe Server", "text-[#3b82f6]");
-                else setStatus("Connecting to Belgium...", "text-amber-500");
-            });
-        } catch (e) { setStatus("Error: " + e.message, "text-red-500"); }
-
-        if(!localStorage.getItem('vuid')) localStorage.setItem('vuid', 'u' + Math.random().toString(36).substr(2, 7));
-        let localPlayer = { id: localStorage.getItem('vuid'), name: "" };
-        let roomRef = null;
-        let lastKnownState = null;
-
-        const prompts = [
-            {g:"Hospital",o:"Hotel"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"},
-            {g:"Coffee",o:"Red Bull"},{g:"Library",o:"Church"},{g:"Elephant",o:"Dino"}
-        ];
-
-        // --- LOBBY ---
-        function joinOrCreateRoom() {
-            const name = document.getElementById('player-name').value.trim().toUpperCase();
-            let code = document.getElementById('room-input').value.trim().toUpperCase();
-            if(!name) return alert("Name required");
-            localPlayer.name = name;
-
-            if(!code) {
-                code = Math.random().toString(36).substring(2, 6).toUpperCase();
-                db.ref('rooms/' + code).set({ gameState: "LOBBY", hostId: localPlayer.id }).then(() => connect(code));
-            } else {
-                db.ref('rooms/' + code).once('value', s => s.exists() ? connect(code) : alert("Not found"));
-            }
+    // 3. Screen Switching
+    const newState = data.gameState || "LOBBY";
+    if (newState !== lastKnownState) {
+        lastKnownState = newState;
+        if(newState === "LOBBY") showScreen('screen-lobby');
+        if(newState === "INPUT") {
+            const isOdd = localPlayer.id === data.oddOneId;
+            const pText = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
+            document.getElementById('prompt-text').innerText = `Describe ${pText} in exactly 5 words.`;
+            resetInputUI();
+            showScreen('screen-input');
         }
-
-        function connect(code) {
-            roomRef = db.ref('rooms/' + code);
-            roomRef.child('players/' + localPlayer.id).update({ id: localPlayer.id, name: localPlayer.name, score: 0, answer: "", vote: "" });
-            roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
-
-            document.getElementById('entry-form').classList.add('hidden');
-            document.getElementById('waiting-area').classList.remove('hidden');
-            document.getElementById('room-code-display').innerText = code;
-            roomRef.on('value', snap => { if(snap.val()) sync(snap.val()); });
+        if(newState === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
+        if(newState === "RESULTS") {
+            const oddP = data.players[data.oddOneId];
+            document.getElementById('revealed-name').innerText = oddP ? oddP.name : "Unknown";
+            showScreen('screen-results');
         }
+    }
+    updateScoreboard(players);
+}
 
-        function sync(data) {
-            const players = Object.values(data.players || {});
-            const count = players.length;
-            
-            // Lobby Update
-            document.getElementById('current-count').innerText = count;
-            document.getElementById('lobby-player-list').innerHTML = players.map(p => `
-                <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
-                    ${p.name} ${p.id === data.hostId ? '👑' : ''}
-                </div>
-            `).join('');
+// --- 3. GAME ACTIONS ---
 
-            // Scoreboard
-            document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => (b.score||0)-(a.score||0)).map(p => `
-                <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
-                    <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
-                    <div class="text-xl font-black">${p.score || 0}</div>
-                </div>
-            `).join('');
+function hostStartGame() {
+    roomRef.child('players').once('value', snap => {
+        const pObj = snap.val();
+        const ids = Object.keys(pObj);
+        const updates = {};
+        ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
+        
+        updates.gameState = "INPUT";
+        updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+        updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
+        updates.shuffled = ids.sort(() => Math.random() - 0.5);
+        roomRef.update(updates);
+    });
+}
 
-            // State Guard (Prevents resetting UI unnecessarily)
-            const newState = data.gameState || "LOBBY";
-            if (newState !== lastKnownState) {
-                lastKnownState = newState;
-                handleStateChange(data);
-            }
+function validateInput() {
+    const val = document.getElementById('answer-input').value.trim();
+    const words = val === "" ? [] : val.split(/\s+/);
+    document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = words.length !== 5;
+    btn.style.opacity = words.length === 5 ? "1" : "0.5";
+}
 
-            // Continuous checks
-            if (newState === "LOBBY") {
-                const isHost = data.hostId === localPlayer.id;
-                document.getElementById('host-start-btn').classList.toggle('hidden', !isHost || count < 3);
-            }
-        }
+function submitAnswer() {
+    const val = document.getElementById('answer-input').value.trim();
+    roomRef.child('players/' + localPlayer.id).update({ answer: val });
+    document.getElementById('submit-btn').classList.add('hidden');
+    document.getElementById('waiting-msg').classList.remove('hidden');
 
-        function handleStateChange(data) {
-            const state = data.gameState;
-            if(state === "LOBBY") showScreen('screen-lobby');
-            if(state === "INPUT") {
-                const isOdd = localPlayer.id === data.oddOneId;
-                const p = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
-                document.getElementById('prompt-text').innerText = `Describe ${p} in exactly 5 words.`;
-                resetInputUI();
-                showScreen('screen-input');
-            }
-            if(state === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
-            if(state === "RESULTS") {
-                const oddP = data.players[data.oddOneId];
-                document.getElementById('revealed-name').innerText = oddP ? oddP.name : "Unknown";
-                showScreen('screen-results');
-            }
-        }
-
-        function resetInputUI() {
-            document.getElementById('answer-input').value = "";
-            document.getElementById('submit-btn').classList.remove('hidden');
-            document.getElementById('submit-btn').disabled = true;
-            document.getElementById('waiting-msg').classList.add('hidden');
-            document.getElementById('word-count-label').innerText = "Words: 0 / 5";
-        }
-
-        // --- GAME ACTIONS ---
-        function hostStartGame() {
-            roomRef.child('players').once('value', snap => {
-                const ids = Object.keys(snap.val());
-                const updates = {};
-                ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
-                updates.gameState = "INPUT";
-                updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-                updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
-                updates.shuffled = ids.sort(() => Math.random() - 0.5);
-                roomRef.update(updates);
-            });
-        }
-
-        function validateInput() {
-            const val = document.getElementById('answer-input').value.trim();
-            const words = val === "" ? [] : val.split(/\s+/);
-            document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
-            const btn = document.getElementById('submit-btn');
-            btn.disabled = words.length !== 5;
-            btn.style.opacity = words.length === 5 ? "1" : "0.5";
-        }
-
-        function submitAnswer() {
-            const val = document.getElementById('answer-input').value.trim();
-            roomRef.child('players/' + localPlayer.id).update({ answer: val });
-            document.getElementById('submit-btn').classList.add('hidden');
-            document.getElementById('waiting-msg').classList.remove('hidden');
-
-            roomRef.once('value', s => {
-                if(s.val().hostId === localPlayer.id) {
-                    const int = setInterval(() => {
-                        roomRef.child('players').once('value', ps => {
-                            if(Object.values(ps.val()).every(p => p.answer !== "")) {
-                                clearInterval(int);
-                                roomRef.update({ gameState: "VOTING" });
-                            }
-                        });
-                    }, 1000);
-                }
-            });
-        }
-
-        function renderVoting(data) {
-            const list = document.getElementById('voting-list');
-            list.innerHTML = "";
-            data.shuffled.forEach(id => {
-                if(id === localPlayer.id) return;
-                const p = data.players[id];
-                const btn = document.createElement('button');
-                btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
-                btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
-                btn.onclick = () => {
-                    roomRef.child('players/' + localPlayer.id).update({ vote: id });
-                    list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
-                    if(data.hostId === localPlayer.id) checkVotes(data.oddOneId);
-                };
-                list.appendChild(btn);
-            });
-        }
-
-        function checkVotes(oddId) {
+    // Host checks if all submitted
+    roomRef.once('value', s => {
+        if(s.val().hostId === localPlayer.id) {
             const int = setInterval(() => {
-                roomRef.child('players').once('value', s => {
-                    const ps = Object.values(s.val());
-                    if(ps.every(p => p.vote !== "")) {
+                roomRef.child('players').once('value', ps => {
+                    const allData = Object.values(ps.val());
+                    if(allData.every(p => p.answer !== "")) {
                         clearInterval(int);
-                        calculateFinalScores(s.val(), oddId);
+                        roomRef.update({ gameState: "VOTING" });
                     }
                 });
             }, 1000);
         }
+    });
+}
 
-        function calculateFinalScores(players, oddId) {
-            const ids = Object.keys(players);
-            const updates = {};
-            ids.forEach(id => {
-                let pts = 0;
-                if(id === oddId) {
-                    pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
-                } else if(players[id].vote === oddId) {
-                    pts = 1;
-                }
-                if(pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
-            });
-            updates.gameState = "RESULTS";
-            roomRef.update(updates);
-        }
-
-        function showScreen(id) {
-            const screens = ['screen-lobby','screen-input','screen-voting','screen-results'];
-            screens.forEach(s => document.getElementById(s).classList.add('hidden-screen'));
-            document.getElementById(id).classList.remove('hidden-screen');
-            document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
-        }
-
-        function handleNextRound() {
-            roomRef.once('value', s => { if(localPlayer.id === s.val().hostId) hostStartGame(); });
-        }
-
-        lucide.createIcons();
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const r = urlParams.get('room');
-            if (r) document.getElementById('room-input').value = r.toUpperCase();
+function renderVoting(data) {
+    const list = document.getElementById('voting-list');
+    list.innerHTML = "";
+    data.shuffled.forEach(id => {
+        if(id === localPlayer.id) return;
+        const p = data.players[id];
+        const btn = document.createElement('button');
+        btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
+        btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
+        btn.onclick = () => {
+            roomRef.child('players/' + localPlayer.id).update({ vote: id });
+            list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
+            // Host checks if voting done
+            if(data.hostId === localPlayer.id) {
+                const int = setInterval(() => {
+                    roomRef.child('players').once('value', s => {
+                        const ps = Object.values(s.val());
+                        if(ps.every(p => p.vote !== "")) {
+                            clearInterval(int);
+                            calculateFinalScores(s.val(), data.oddOneId);
+                        }
+                    });
+                }, 1000);
+            }
         };
+        list.appendChild(btn);
+    });
+}
+
+function calculateFinalScores(players, oddId) {
+    const ids = Object.keys(players);
+    const updates = {};
+    ids.forEach(id => {
+        let pts = 0;
+        if(id === oddId) {
+            pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
+        } else if(players[id].vote === oddId) {
+            pts = 1;
+        }
+        if(pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
+    });
+    updates.gameState = "RESULTS";
+    roomRef.update(updates);
+}
+
+function updateScoreboard(players) {
+    document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => (b.score||0)-(a.score||0)).map(p => `
+        <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
+            <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
+            <div class="text-xl font-black">${p.score || 0}</div>
+        </div>
+    `).join('');
+}
+
+function resetInputUI() {
+    document.getElementById('answer-input').value = "";
+    document.getElementById('submit-btn').classList.remove('hidden');
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('waiting-msg').classList.add('hidden');
+    document.getElementById('word-count-label').innerText = "Words: 0 / 5";
+}
+
+function showScreen(id) {
+    ['screen-lobby','screen-input','screen-voting','screen-results'].forEach(s => document.getElementById(s).classList.add('hidden-screen'));
+    document.getElementById(id).classList.remove('hidden-screen');
+    document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
+}
+
+function handleNextRound() {
+    roomRef.once('value', s => { if(localPlayer.id === s.val().hostId) hostStartGame(); });
+}
+
+lucide.createIcons();
     </script>
 </body>
 </html>
