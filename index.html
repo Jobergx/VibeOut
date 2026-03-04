@@ -138,7 +138,6 @@ let currentRoomCode = null;
 let roomRef = null;
 
 // --- 3. THE FIXED ENTRY LOGIC ---
-
 function joinOrCreateRoom() {
     const nameInput = document.getElementById('player-name').value.trim().toUpperCase();
     let codeInput = document.getElementById('room-input').value.trim().toUpperCase();
@@ -159,35 +158,66 @@ function joinOrCreateRoom() {
         currentRoomCode = newCode;
         localPlayer.isHost = true;
         
-        const roomPath = db.ref('rooms/' + newCode);
-        roomPath.set({
+        console.log("Attempting to create room:", newCode);
+
+        // We use .update instead of .set here as it's often more reliable for initial writes
+        db.ref('rooms/' + newCode).update({
             gameState: "LOBBY",
             hostId: localPlayer.id,
             createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-            enterRoomUI(newCode);
-        }).catch(err => {
-            setStatus("Write Error: Check Rules", "text-red-500");
-            btn.disabled = false;
-            btn.innerText = "ENTER GAME";
+        }, (error) => {
+            if (error) {
+                console.error("Write failed:", error);
+                alert("DATABASE REJECTED WRITE: " + error.message);
+                btn.disabled = false;
+                btn.innerText = "ENTER GAME";
+            } else {
+                console.log("Write successful!");
+                setupRoomConnection(newCode);
+            }
         });
     } else {
         // --- JOINING ---
-        db.ref('rooms/' + codeInput).once('value', snap => {
+        db.ref('rooms/' + codeInput).once('value').then(snap => {
             if (snap.exists()) {
                 currentRoomCode = codeInput;
-                enterRoomUI(codeInput);
+                setupRoomConnection(codeInput);
             } else {
-                alert("Room " + codeInput + " not found!");
+                alert("Room not found! Double check the code.");
                 btn.disabled = false;
                 btn.innerText = "ENTER GAME";
             }
         }).catch(err => {
-            setStatus("Read Error: Check Rules", "text-red-500");
+            alert("READ ERROR: " + err.message);
             btn.disabled = false;
-            btn.innerText = "ENTER GAME";
         });
     }
+}
+
+function setupRoomConnection(code) {
+    roomRef = db.ref('rooms/' + code);
+    
+    // Add player
+    roomRef.child('players/' + localPlayer.id).set({
+        name: localPlayer.name,
+        score: 0,
+        isHost: localPlayer.isHost,
+        answer: "",
+        vote: ""
+    }).then(() => {
+        // Only switch UI AFTER we are sure the player is in the DB
+        document.getElementById('entry-form').classList.add('hidden');
+        document.getElementById('waiting-area').classList.remove('hidden');
+        document.getElementById('room-code-display').innerText = code;
+        
+        // Start listening for game changes
+        roomRef.on('value', snap => {
+            const data = snap.val();
+            if (data) syncGameData(data);
+        });
+    });
+
+    roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
 }
 
 function enterRoomUI(code) {
