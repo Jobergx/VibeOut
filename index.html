@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VibeOut | Social Deduction</title>
     
-    <meta property="og:title" content="VibeOut | Spot the Odd One">
-    <meta property="og:description" content="Exactly 5 words. One imposter. Can you survive?">
-    <meta property="og:image" content="https://vibeout.vercel.app/og-image.png">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -59,7 +55,7 @@
         </section>
 
         <section id="screen-input" class="hidden-screen screen-fade w-full max-w-md">
-            <div class="border-2 border-[#3b82f6]/30 bg-slate-900 p-6 rounded-3xl mb-6 shadow-xl">
+            <div class="border-2 border-[#3b82f6]/30 bg-slate-900 p-6 rounded-3xl mb-6 shadow-xl text-center">
                 <h2 class="text-[#3b82f6] text-[10px] font-bold uppercase mb-2 tracking-widest">Your Task</h2>
                 <p id="prompt-text" class="text-2xl font-bold leading-tight">Describe the word in exactly 5 words.</p>
             </div>
@@ -68,11 +64,11 @@
                 <span id="word-count-label" class="text-[10px] font-bold text-slate-500 uppercase">Words: 0 / 5</span>
             </div>
             <button id="submit-btn" onclick="submitAnswer()" disabled class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl opacity-50 active:scale-95 transition-all shadow-lg shadow-blue-900/20">SUBMIT TRUTH</button>
-            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic animate-pulse uppercase text-xs tracking-widest">Vibe received. Waiting for others...</div>
+            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic animate-pulse uppercase text-xs tracking-widest">Waiting for others...</div>
         </section>
 
         <section id="screen-voting" class="hidden-screen screen-fade w-full max-w-md">
-            <h2 class="text-center text-xl font-bold mb-6">Identify the <span class="text-[#f59e0b]">Odd One Out</span></h2>
+            <h2 class="text-center text-xl font-bold mb-6 italic">Who is the <span class="text-[#f59e0b]">Odd One Out?</span></h2>
             <div id="voting-list" class="flex flex-col gap-3"></div>
         </section>
 
@@ -87,12 +83,11 @@
 
     <div id="ad-overlay" class="hidden fixed inset-0 bg-[#0f172a] z-50 flex flex-col items-center justify-center text-center p-10">
         <div class="w-16 h-16 border-4 border-[#3b82f6] border-t-transparent rounded-full animate-spin mb-8"></div>
-        <p class="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em] mb-4">Resetting Tournament</p>
-        <p class="text-2xl font-bold text-white mb-8 leading-tight">Next game starting in <span id="ad-timer" class="text-[#3b82f6]">5</span>s</p>
+        <p class="text-2xl font-bold text-white mb-8 leading-tight">New Tournament starting in <span id="ad-timer" class="text-[#3b82f6]">5</span>s</p>
     </div>
 
     <script>
-        // --- FIREBASE INITIALIZATION ---
+        // --- 1. CONFIG (Verify these keys) ---
         const firebaseConfig = {
             apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
             authDomain: "vibeout-d814c.firebaseapp.com",
@@ -102,15 +97,14 @@
             appId: "1:784876378174:web:dec7a58f1013cb593b596f",
             measurementId: "G-3MGPL9LNF6"
         };
-       
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // --- GAME LOGIC ---
-        const prompts = [{g:"A Hospital",o:"A Hotel"},{g:"Library",o:"Museum"},{g:"Pizza",o:"A Taco"},{g:"Elephant",o:"Dinosaur"},{g:"Coffee",o:"Energy Drink"}];
-        let localPlayer = { id: 'p_' + Math.random().toString(36).substr(2, 9), name: "", isHost: false, score: 0 };
-        let roomCode = null;
+        // --- 2. GAME STATE ---
+        const prompts = [{g:"Hospital",o:"Hotel"},{g:"Library",o:"Museum"},{g:"Pizza",o:"Taco"},{g:"Elephant",o:"Dino"},{g:"Coffee",o:"Energy Drink"}];
+        let localPlayer = { id: 'p_' + Math.random().toString(36).substr(2, 9), name: "", isHost: false };
+        let currentRoomCode = null;
         let roomRef = null;
 
         function showScreen(id) {
@@ -119,6 +113,7 @@
             document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
         }
 
+        // --- 3. ROOM JOIN/CREATE LOGIC ---
         function joinOrCreateRoom() {
             const nameInput = document.getElementById('player-name').value.trim().toUpperCase();
             let codeInput = document.getElementById('room-input').value.trim().toUpperCase();
@@ -126,21 +121,42 @@
             localPlayer.name = nameInput;
 
             if (!codeInput) {
+                // HOSTING
                 codeInput = Math.random().toString(36).substring(2, 6).toUpperCase();
                 localPlayer.isHost = true;
-                startRoom(codeInput);
+                currentRoomCode = codeInput;
+                roomRef = db.ref('rooms/' + codeInput);
+                
+                // Initialize the room structure so the path EXISTS for others
+                roomRef.set({ 
+                    gameState: "LOBBY", 
+                    hostId: localPlayer.id,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP 
+                }).then(() => {
+                    startRoom(codeInput);
+                });
             } else {
+                // JOINING
                 db.ref('rooms/' + codeInput).once('value', snap => {
-                    if (snap.exists()) startRoom(codeInput);
-                    else alert("Room not found!");
+                    if (snap.exists()) {
+                        currentRoomCode = codeInput;
+                        startRoom(codeInput);
+                    } else {
+                        alert("Room " + codeInput + " not found!");
+                    }
                 });
             }
         }
 
         function startRoom(code) {
-            roomCode = code;
             roomRef = db.ref('rooms/' + code);
-            roomRef.child('players/' + localPlayer.id).set({ name: localPlayer.name, score: 0, isHost: localPlayer.isHost, answer: "", vote: "" });
+            roomRef.child('players/' + localPlayer.id).set({ 
+                name: localPlayer.name, 
+                score: 0, 
+                isHost: localPlayer.isHost, 
+                answer: "", 
+                vote: "" 
+            });
             roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
             
             document.getElementById('entry-form').classList.add('hidden');
@@ -149,19 +165,21 @@
             
             roomRef.on('value', snap => {
                 const data = snap.val();
-                if (!data) return;
-                syncGame(data);
+                if (data) syncGame(data);
             });
         }
 
         function syncGame(data) {
-            const players = data.players ? Object.values(data.players) : [];
+            const players = data.players ? Object.entries(data.players).map(([id, p]) => ({...p, id})) : [];
             document.getElementById('lobby-player-list').innerHTML = players.map(p => `
-                <div class="${p.name === localPlayer.name ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">${p.name}</div>
+                <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">${p.name}</div>
             `).join('');
             document.getElementById('current-count').innerText = players.length;
             
-            if (localPlayer.isHost && players.length >= 3) document.getElementById('host-start-btn').classList.remove('hidden');
+            if (localPlayer.isHost && players.length >= 3) {
+                document.getElementById('host-start-btn').classList.remove('hidden');
+                document.getElementById('min-players-note').classList.add('hidden');
+            }
 
             const state = data.gameState || "LOBBY";
             if (state === "LOBBY") showScreen('screen-lobby');
@@ -182,23 +200,26 @@
             updateScoreboard(players);
         }
 
+        // --- 4. GAMEFLOW ---
         function hostStartGame() {
             const pair = prompts[Math.floor(Math.random() * prompts.length)];
             roomRef.child('players').once('value', snap => {
-                const ids = Object.keys(snap.val());
+                const playersObj = snap.val();
+                const ids = Object.keys(playersObj);
                 const oddId = ids[Math.floor(Math.random() * ids.length)];
                 
-                // Clear old round data
+                // Reset player-specific round data
+                const updates = {};
                 ids.forEach(id => {
-                    roomRef.child(`players/${id}`).update({ answer: "", vote: "" });
+                    updates[`players/${id}/answer`] = "";
+                    updates[`players/${id}/vote`] = "";
                 });
+                updates.gameState = "INPUT";
+                updates.currentPrompt = pair;
+                updates.oddOneId = oddId;
+                updates.shuffled = ids.sort(() => Math.random() - 0.5);
 
-                roomRef.update({ 
-                    gameState: "INPUT", 
-                    currentPrompt: pair, 
-                    oddOneId: oddId, 
-                    shuffled: ids.sort(() => Math.random() - 0.5) 
-                });
+                roomRef.update(updates);
             });
         }
 
@@ -237,7 +258,7 @@
                 btn.innerHTML = `<span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">${p.name}</span><p class="text-lg text-white italic leading-snug">"${p.answer}"</p>`;
                 btn.onclick = () => {
                     roomRef.child('players/' + localPlayer.id).update({ vote: id });
-                    list.innerHTML = `<p class="text-center font-bold text-[#f59e0b] uppercase tracking-widest mt-10">Vote Cast. Awaiting results...</p>`;
+                    list.innerHTML = `<p class="text-center font-bold text-[#f59e0b] uppercase tracking-widest mt-10 animate-pulse">Vote Cast. Awaiting others...</p>`;
                     if (localPlayer.isHost) checkVotingDone();
                 };
                 list.appendChild(btn);
@@ -246,8 +267,37 @@
 
         function checkVotingDone() {
             roomRef.child('players').once('value', snap => {
-                const players = Object.values(snap.val());
-                if (players.every(p => p.vote !== "")) roomRef.update({ gameState: "RESULTS" });
+                const players = snap.val();
+                if (Object.values(players).every(p => p.vote !== "")) {
+                    calculateScores(players);
+                }
+            });
+        }
+
+        function calculateScores(players) {
+            roomRef.once('value', snap => {
+                const data = snap.val();
+                const oddId = data.oddOneId;
+                const playerIds = Object.keys(players);
+                const updates = {};
+
+                playerIds.forEach(id => {
+                    let points = 0;
+                    if (id === oddId) {
+                        // Odd one gets points for every person who guessed WRONG
+                        const fooledCount = playerIds.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
+                        points = fooledCount;
+                    } else {
+                        // Normal players get 1 point for guessing the correct odd one
+                        if (players[id].vote === oddId) points = 1;
+                    }
+                    if (points > 0) {
+                        updates[`players/${id}/score`] = (players[id].score || 0) + points;
+                    }
+                });
+
+                updates.gameState = "RESULTS";
+                roomRef.update(updates);
             });
         }
 
@@ -255,10 +305,19 @@
             if ("vibrate" in navigator) navigator.vibrate(200);
             const oddP = data.players[data.oddOneId];
             document.getElementById('revealed-name').innerText = oddP.name;
-            document.getElementById('revealed-name').style.color = "#f59e0b";
             
-            const resList = document.getElementById('round-results-list');
-            resList.innerHTML = `<div class="text-slate-400 italic">Scores are synchronized via game state.</div>`;
+            const resultsDiv = document.getElementById('round-results-list');
+            resultsDiv.innerHTML = `<div class="text-slate-400">Scores have been updated.</div>`;
+            
+            const anyWinner = Object.values(data.players).some(p => (p.score || 0) >= 12);
+            const btn = document.getElementById('next-round-btn');
+            if (anyWinner) {
+                btn.innerText = "FINISH TOURNAMENT";
+                btn.onclick = triggerAdAndRestart;
+            } else {
+                btn.innerText = "NEXT ROUND";
+                btn.onclick = handleNextRound;
+            }
         }
 
         function handleNextRound() {
@@ -267,12 +326,26 @@
 
         function updateScoreboard(players) {
             const list = document.getElementById('scoreboard-list');
-            list.innerHTML = players.map(p => `
+            list.innerHTML = players.sort((a,b) => b.score - a.score).map(p => `
                 <div class="flex flex-col items-center px-4 border-r border-slate-800 min-w-[70px]">
                     <span class="text-[8px] text-slate-500 font-bold uppercase tracking-tight">${p.name}</span>
-                    <span class="text-lg font-black ${p.name === localPlayer.name ? 'text-[#3b82f6]' : 'text-white'}">${p.score || 0}</span>
+                    <span class="text-lg font-black ${p.id === localPlayer.id ? 'text-[#3b82f6]' : 'text-white'}">${p.score || 0}</span>
                 </div>
             `).join('');
+        }
+
+        // --- 5. UTILS ---
+        function copyRoomLink() {
+            const url = `${window.location.origin}${window.location.pathname}?room=${currentRoomCode}`;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.querySelector('[onclick="copyRoomLink()"]');
+                btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-[#3b82f6]"></i>';
+                lucide.createIcons();
+                setTimeout(() => {
+                    btn.innerHTML = '<i data-lucide="share-2" class="w-4 h-4 text-white"></i>';
+                    lucide.createIcons();
+                }, 2000);
+            });
         }
 
         function triggerAdAndRestart() {
@@ -285,38 +358,25 @@
                 if(t <= 0) {
                     clearInterval(iv);
                     overlay.classList.add('hidden');
-                    roomRef.update({ gameState: "LOBBY" }); // Reset game for everyone
+                    if(localPlayer.isHost) {
+                        roomRef.remove().then(() => location.reload());
+                    } else {
+                        location.reload();
+                    }
                 }
             }, 1000);
         }
 
-        lucide.createIcons();
+        // Handle URL Join
         window.onload = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomFromUrl = urlParams.get('room');
-    if (roomFromUrl) {
-        document.getElementById('room-input').value = roomFromUrl.toUpperCase();
-        // Visual cue that they are joining a specific room
-        document.getElementById('room-input').classList.add('border-[#3b82f6]');
-    }
-};
-function copyRoomLink() {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const fullUrl = `${baseUrl}?room=${currentRoomCode}`;
-    
-    navigator.clipboard.writeText(fullUrl).then(() => {
-        // Simple visual feedback
-        const btn = document.querySelector('[onclick="copyRoomLink()"]');
-        const originalInner = btn.innerHTML;
-        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-[#3b82f6]"></i>';
-        lucide.createIcons();
-        
-        setTimeout(() => {
-            btn.innerHTML = originalInner;
             lucide.createIcons();
-        }, 2000);
-    });
-}
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            if (roomFromUrl) {
+                document.getElementById('room-input').value = roomFromUrl.toUpperCase();
+                document.getElementById('room-input').classList.add('border-[#3b82f6]');
+            }
+        };
     </script>
 </body>
 </html>
