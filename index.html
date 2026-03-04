@@ -30,15 +30,17 @@
     <main class="flex-grow p-6 flex flex-col items-center justify-center">
 
         <section id="screen-lobby" class="screen-fade w-full max-w-md text-center">
-            <h1 class="text-6xl font-bold mb-2 italic"><span class="text-[#3b82f6]">Vibe</span>Out</h1>
+            <h1 class="text-6xl font-bold mb-2 tracking-tighter italic"><span class="text-[#3b82f6]">Vibe</span>Out</h1>
+            <p class="text-slate-400 mb-8 text-xs uppercase tracking-widest italic">Exactly 5 words. One imposter.</p>
+            
             <div id="entry-form" class="bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6 shadow-2xl">
                 <input id="player-name" type="text" placeholder="YOUR NAME" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-bold mb-3 outline-none">
                 <input id="room-input" type="text" placeholder="ROOM CODE" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-mono mb-4 outline-none">
                 <button id="entry-btn" onclick="joinOrCreateRoom()" class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl transition-all">ENTER GAME</button>
             </div>
 
-            <div id="waiting-area" class="hidden bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6">
-                <div id="room-code-display" class="text-4xl font-mono font-bold text-[#3b82f6] mb-4">----</div>
+            <div id="waiting-area" class="hidden screen-fade bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6 text-center">
+                <div id="room-code-display" class="text-4xl font-mono font-bold tracking-widest text-[#3b82f6] mb-4">----</div>
                 <div id="lobby-player-list" class="flex flex-wrap justify-center gap-2 mb-4"></div>
                 <button id="host-start-btn" onclick="hostStartGame()" class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl">START GAME</button>
                 <p id="min-players-note" class="text-[10px] text-amber-500 font-bold uppercase mt-2">Waiting for at least 3 players...</p>
@@ -46,284 +48,236 @@
         </section>
 
         <section id="screen-input" class="hidden-screen screen-fade w-full max-w-md">
-            <div class="bg-slate-900 p-6 rounded-3xl mb-6 border-2 border-[#3b82f6]/30 text-center">
-                <h2 class="text-[#3b82f6] text-[10px] font-bold uppercase mb-2">PROMPT</h2>
-                <p id="prompt-text" class="text-2xl font-bold leading-tight">Loading...</p>
+            <div class="border-2 border-[#3b82f6]/30 bg-slate-900 p-6 rounded-3xl mb-6 shadow-xl text-center">
+                <h2 class="text-[#3b82f6] text-[10px] font-bold uppercase mb-2 tracking-widest">Prompt</h2>
+                <p id="prompt-text" class="text-2xl font-bold leading-tight">Wait...</p>
             </div>
-            <textarea id="answer-input" oninput="validateInput()" placeholder="Describe it in exactly 5 words..." class="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 text-white text-lg h-36 resize-none outline-none mb-2"></textarea>
-            <div id="word-count-label" class="text-[10px] font-bold text-slate-500 uppercase px-2 mb-4">Words: 0 / 5</div>
-            <button id="submit-btn" onclick="submitAnswer()" disabled class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl opacity-50">SUBMIT VIBE</button>
-            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic text-xs uppercase animate-pulse">Waiting for other players...</div>
+            <textarea id="answer-input" oninput="validateInput()" placeholder="Exactly five words..." class="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 text-white text-lg h-36 resize-none outline-none mb-2"></textarea>
+            <div id="word-count-label" class="text-[10px] font-bold text-slate-500 uppercase mb-4 px-2">Words: 0 / 5</div>
+            <button id="submit-btn" onclick="submitAnswer()" disabled class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl opacity-50">SUBMIT</button>
+            <div id="waiting-msg" class="hidden mt-6 text-center text-slate-400 italic text-xs uppercase animate-pulse">Vibe sent. Waiting...</div>
         </section>
 
         <section id="screen-voting" class="hidden-screen screen-fade w-full max-w-md">
-            <h2 class="text-center text-xl font-bold mb-6 italic">Identify the <span class="text-[#f59e0b]">Odd One Out</span></h2>
+            <h2 class="text-center text-xl font-bold mb-6 italic">Who is the <span class="text-[#f59e0b]">Odd One Out?</span></h2>
             <div id="voting-list" class="flex flex-col gap-3"></div>
         </section>
 
         <section id="screen-results" class="hidden-screen screen-fade w-full max-w-md text-center">
-            <h2 class="text-slate-400 text-[10px] font-bold mb-2 uppercase tracking-widest text-xs">The Odd One was</h2>
+            <h2 class="text-slate-400 text-[10px] font-bold mb-2 uppercase tracking-widest">The Odd One was</h2>
             <div id="revealed-name" class="text-5xl font-black text-[#f59e0b] uppercase mb-8">----</div>
-            <button id="next-round-btn" onclick="handleNextRound()" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-xl shadow-xl">NEXT ROUND</button>
+            <button id="next-round-btn" onclick="handleNextRound()" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-xl">Next Round</button>
         </section>
+
     </main>
 
     <script>
-       // --- 1. CONFIG ---
-const firebaseConfig = {
-    apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
-    authDomain: "vibeout-d814c.firebaseapp.com",
-    databaseURL: "https://vibeout-d814c-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "vibeout-d814c",
-    storageBucket: "vibeout-d814c.firebasestorage.app",
-    messagingSenderId: "784876378174",
-    appId: "1:784876378174:web:dec7a58f1013cb593b596f"
-};
-
-function setStatus(msg, color = "text-slate-400") {
-    const el = document.getElementById('debug-log');
-    if(el) { el.innerText = "Status: " + msg; el.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`; }
-}
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// Persistent ID so you stay Host even on refresh
-if(!localStorage.getItem('vuid')) localStorage.setItem('vuid', 'u' + Math.random().toString(36).substr(2, 7));
-let localPlayer = { id: localStorage.getItem('vuid'), name: "" };
-let roomRef = null;
-let lastKnownState = null;
-
-const prompts = [
-    {g:"Hospital",o:"Hotel"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"},
-    {g:"Coffee",o:"Red Bull"},{g:"Library",o:"Church"},{g:"Elephant",o:"Dino"}
-];
-
-// --- 2. LOBBY ENTRY ---
-
-function joinOrCreateRoom() {
-    const name = document.getElementById('player-name').value.trim().toUpperCase();
-    let code = document.getElementById('room-input').value.trim().toUpperCase();
-    if(!name) return alert("Enter name");
-    localPlayer.name = name;
-
-    if(!code) {
-        // HOSTING
-        code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        db.ref('rooms/' + code).set({ 
-            gameState: "LOBBY", 
-            hostId: localPlayer.id,
-            createdAt: firebase.database.ServerValue.TIMESTAMP 
-        }).then(() => connect(code));
-    } else {
-        // JOINING
-        db.ref('rooms/' + code).once('value', s => s.exists() ? connect(code) : alert("Room not found"));
-    }
-}
-
-function connect(code) {
-    roomRef = db.ref('rooms/' + code);
-    
-    // Add player to DB
-    roomRef.child('players/' + localPlayer.id).update({
-        id: localPlayer.id,
-        name: localPlayer.name,
-        score: 0,
-        answer: "",
-        vote: ""
-    });
-
-    roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
-
-    document.getElementById('entry-form').classList.add('hidden');
-    document.getElementById('waiting-area').classList.remove('hidden');
-    document.getElementById('room-code-display').innerText = code;
-
-    roomRef.on('value', snap => {
-        const data = snap.val();
-        if(data) sync(data);
-    });
-}
-
-function sync(data) {
-    const players = Object.values(data.players || {});
-    const count = players.length;
-    
-    // 1. Update Lobby UI
-    document.getElementById('current-count').innerText = count;
-    document.getElementById('lobby-player-list').innerHTML = players.map(p => `
-        <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
-            ${p.name} ${p.id === data.hostId ? '👑' : ''}
-        </div>
-    `).join('');
-
-    // 2. THE HOST CHECK
-    const isMeHost = (data.hostId === localPlayer.id);
-    const startBtn = document.getElementById('host-start-btn');
-    const note = document.getElementById('min-players-note');
-
-    if (isMeHost) {
-        startBtn.classList.remove('hidden');
-        // If 3+ players, enable the button. Otherwise, keep it visible but disabled.
-        if (count >= 3) {
-            startBtn.disabled = false;
-            startBtn.style.opacity = "1";
-            startBtn.innerText = "START GAME";
-            note.classList.add('hidden');
-        } else {
-            startBtn.disabled = false; // ENABLED FOR TESTING - Remove this line later!
-            startBtn.style.opacity = "0.6";
-            startBtn.innerText = "DEBUG START (Min 3 recommended)";
-            note.classList.remove('hidden');
-        }
-    } else {
-        startBtn.classList.add('hidden');
-        note.classList.remove('hidden');
-    }
-
-    // 3. Screen Switching
-    const newState = data.gameState || "LOBBY";
-    if (newState !== lastKnownState) {
-        lastKnownState = newState;
-        if(newState === "LOBBY") showScreen('screen-lobby');
-        if(newState === "INPUT") {
-            const isOdd = localPlayer.id === data.oddOneId;
-            const pText = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
-            document.getElementById('prompt-text').innerText = `Describe ${pText} in exactly 5 words.`;
-            resetInputUI();
-            showScreen('screen-input');
-        }
-        if(newState === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
-        if(newState === "RESULTS") {
-            const oddP = data.players[data.oddOneId];
-            document.getElementById('revealed-name').innerText = oddP ? oddP.name : "Unknown";
-            showScreen('screen-results');
-        }
-    }
-    updateScoreboard(players);
-}
-
-// --- 3. GAME ACTIONS ---
-
-function hostStartGame() {
-    roomRef.child('players').once('value', snap => {
-        const pObj = snap.val();
-        const ids = Object.keys(pObj);
-        const updates = {};
-        ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
-        
-        updates.gameState = "INPUT";
-        updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-        updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
-        updates.shuffled = ids.sort(() => Math.random() - 0.5);
-        roomRef.update(updates);
-    });
-}
-
-function validateInput() {
-    const val = document.getElementById('answer-input').value.trim();
-    const words = val === "" ? [] : val.split(/\s+/);
-    document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
-    const btn = document.getElementById('submit-btn');
-    btn.disabled = words.length !== 5;
-    btn.style.opacity = words.length === 5 ? "1" : "0.5";
-}
-
-function submitAnswer() {
-    const val = document.getElementById('answer-input').value.trim();
-    roomRef.child('players/' + localPlayer.id).update({ answer: val });
-    document.getElementById('submit-btn').classList.add('hidden');
-    document.getElementById('waiting-msg').classList.remove('hidden');
-
-    // Host checks if all submitted
-    roomRef.once('value', s => {
-        if(s.val().hostId === localPlayer.id) {
-            const int = setInterval(() => {
-                roomRef.child('players').once('value', ps => {
-                    const allData = Object.values(ps.val());
-                    if(allData.every(p => p.answer !== "")) {
-                        clearInterval(int);
-                        roomRef.update({ gameState: "VOTING" });
-                    }
-                });
-            }, 1000);
-        }
-    });
-}
-
-function renderVoting(data) {
-    const list = document.getElementById('voting-list');
-    list.innerHTML = "";
-    data.shuffled.forEach(id => {
-        if(id === localPlayer.id) return;
-        const p = data.players[id];
-        const btn = document.createElement('button');
-        btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
-        btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
-        btn.onclick = () => {
-            roomRef.child('players/' + localPlayer.id).update({ vote: id });
-            list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
-            // Host checks if voting done
-            if(data.hostId === localPlayer.id) {
-                const int = setInterval(() => {
-                    roomRef.child('players').once('value', s => {
-                        const ps = Object.values(s.val());
-                        if(ps.every(p => p.vote !== "")) {
-                            clearInterval(int);
-                            calculateFinalScores(s.val(), data.oddOneId);
-                        }
-                    });
-                }, 1000);
-            }
+        // --- 1. CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
+            authDomain: "vibeout-d814c.firebaseapp.com",
+            databaseURL: "https://vibeout-d814c-default-rtdb.europe-west1.firebasedatabase.app/",
+            projectId: "vibeout-d814c",
+            storageBucket: "vibeout-d814c.firebasestorage.app",
+            messagingSenderId: "784876378174",
+            appId: "1:784876378174:web:dec7a58f1013cb593b596f"
         };
-        list.appendChild(btn);
-    });
-}
 
-function calculateFinalScores(players, oddId) {
-    const ids = Object.keys(players);
-    const updates = {};
-    ids.forEach(id => {
-        let pts = 0;
-        if(id === oddId) {
-            pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
-        } else if(players[id].vote === oddId) {
-            pts = 1;
+        // --- 2. INITIALIZATION ---
+        function setStatus(msg, color = "text-slate-400") {
+            const el = document.getElementById('debug-log');
+            if (el) { el.innerText = "Status: " + msg; el.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`; }
         }
-        if(pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
-    });
-    updates.gameState = "RESULTS";
-    roomRef.update(updates);
-}
 
-function updateScoreboard(players) {
-    document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => (b.score||0)-(a.score||0)).map(p => `
-        <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
-            <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
-            <div class="text-xl font-black">${p.score || 0}</div>
-        </div>
-    `).join('');
-}
+        try {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.database();
+            db.ref(".info/connected").on("value", snap => {
+                if (snap.val() === true) setStatus("Online: Europe Server", "text-[#3b82f6]");
+                else setStatus("Connecting to Belgium...", "text-amber-500");
+            });
+        } catch (e) { setStatus("Init Failed: " + e.message, "text-red-500"); }
 
-function resetInputUI() {
-    document.getElementById('answer-input').value = "";
-    document.getElementById('submit-btn').classList.remove('hidden');
-    document.getElementById('submit-btn').disabled = true;
-    document.getElementById('waiting-msg').classList.add('hidden');
-    document.getElementById('word-count-label').innerText = "Words: 0 / 5";
-}
+        if (!localStorage.getItem('vuid')) localStorage.setItem('vuid', 'u' + Math.random().toString(36).substr(2, 7));
+        let localPlayer = { id: localStorage.getItem('vuid'), name: "" };
+        let roomRef = null;
+        let lastKnownState = null;
 
-function showScreen(id) {
-    ['screen-lobby','screen-input','screen-voting','screen-results'].forEach(s => document.getElementById(s).classList.add('hidden-screen'));
-    document.getElementById(id).classList.remove('hidden-screen');
-    document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
-}
+        const prompts = [{g:"Hospital",o:"Hotel"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"},{g:"Coffee",o:"Red Bull"},{g:"Library",o:"Church"}];
 
-function handleNextRound() {
-    roomRef.once('value', s => { if(localPlayer.id === s.val().hostId) hostStartGame(); });
-}
+        // --- 3. LOBBY ENGINE ---
+        function joinOrCreateRoom() {
+            const name = document.getElementById('player-name').value.trim().toUpperCase();
+            let code = document.getElementById('room-input').value.trim().toUpperCase();
+            if (!name) return alert("Enter your name!");
+            localPlayer.name = name;
 
-lucide.createIcons();
+            if (!code) {
+                code = Math.random().toString(36).substring(2, 6).toUpperCase();
+                db.ref('rooms/' + code).set({ gameState: "LOBBY", hostId: localPlayer.id }).then(() => connectToRoom(code));
+            } else {
+                db.ref('rooms/' + code).once('value', s => s.exists() ? connectToRoom(code) : alert("Room not found!"));
+            }
+        }
+
+        function connectToRoom(code) {
+            roomRef = db.ref('rooms/' + code);
+            roomRef.child('players/' + localPlayer.id).update({ id: localPlayer.id, name: localPlayer.name, score: 0, answer: "", vote: "" });
+            roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
+
+            document.getElementById('entry-form').classList.add('hidden');
+            document.getElementById('waiting-area').classList.remove('hidden');
+            document.getElementById('room-code-display').innerText = code;
+
+            roomRef.on('value', snap => {
+                const data = snap.val();
+                if (data) syncUI(data);
+            });
+        }
+
+        function syncUI(data) {
+            const players = Object.values(data.players || {});
+            const count = players.length;
+
+            document.getElementById('current-count').innerText = count;
+            document.getElementById('lobby-player-list').innerHTML = players.map(p => `
+                <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
+                    ${p.name} ${p.id === data.hostId ? '👑' : ''}
+                </div>
+            `).join('');
+
+            // UI Transitions
+            const newState = data.gameState || "LOBBY";
+            if (newState !== lastKnownState) {
+                lastKnownState = newState;
+                if (newState === "LOBBY") showScreen('screen-lobby');
+                if (newState === "INPUT") {
+                    const isOdd = localPlayer.id === data.oddOneId;
+                    const pTxt = isOdd ? data.currentPrompt.o : data.currentPrompt.g;
+                    document.getElementById('prompt-text').innerText = `Describe ${pTxt} in 5 words.`;
+                    resetInputUI();
+                    showScreen('screen-input');
+                }
+                if (newState === "VOTING") { renderVotingList(data); showScreen('screen-voting'); }
+                if (newState === "RESULTS") {
+                    document.getElementById('revealed-name').innerText = data.players[data.oddOneId].name;
+                    showScreen('screen-results');
+                }
+            }
+
+            // Host Button (Requires 3 players)
+            if (data.hostId === localPlayer.id) {
+                const startBtn = document.getElementById('host-start-btn');
+                startBtn.classList.toggle('hidden', false); // Host always sees it
+                startBtn.disabled = count < 3;
+                startBtn.style.opacity = count < 3 ? "0.5" : "1";
+                startBtn.innerText = count < 3 ? "WAITING FOR 3..." : "START GAME";
+                document.getElementById('min-players-note').classList.toggle('hidden', count >= 3);
+            }
+            
+            updateScoreboard(players);
+        }
+
+        // --- 4. GAME ACTIONS ---
+        function hostStartGame() {
+            roomRef.child('players').once('value', snap => {
+                const ids = Object.keys(snap.val());
+                const updates = {};
+                ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
+                updates.gameState = "INPUT";
+                updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
+                updates.shuffled = ids.sort(() => Math.random() - 0.5);
+                roomRef.update(updates);
+            });
+        }
+
+        function validateInput() {
+            const val = document.getElementById('answer-input').value.trim();
+            const words = val === "" ? [] : val.split(/\s+/);
+            const ok = words.length === 5;
+            document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
+            document.getElementById('submit-btn').disabled = !ok;
+            document.getElementById('submit-btn').style.opacity = ok ? "1" : "0.5";
+        }
+
+        function submitAnswer() {
+            const val = document.getElementById('answer-input').value.trim();
+            roomRef.child('players/' + localPlayer.id).update({ answer: val });
+            document.getElementById('submit-btn').classList.add('hidden');
+            document.getElementById('waiting-msg').classList.remove('hidden');
+
+            roomRef.once('value', s => {
+                if(s.val().hostId === localPlayer.id) {
+                    const i = setInterval(() => {
+                        roomRef.child('players').once('value', ps => {
+                            if(Object.values(ps.val()).every(p => p.answer)) { clearInterval(i); roomRef.update({ gameState: "VOTING" }); }
+                        });
+                    }, 1000);
+                }
+            });
+        }
+
+        function renderVotingList(data) {
+            const list = document.getElementById('voting-list');
+            list.innerHTML = "";
+            data.shuffled.forEach(id => {
+                if (id === localPlayer.id) return;
+                const p = data.players[id];
+                const btn = document.createElement('button');
+                btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 mb-2";
+                btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white">"${p.answer}"</p>`;
+                btn.onclick = () => {
+                    roomRef.child('players/' + localPlayer.id).update({ vote: id });
+                    list.innerHTML = "<p class='text-center mt-10 italic'>Vote Cast. Waiting...</p>";
+                    if (data.hostId === localPlayer.id) {
+                        const i = setInterval(() => {
+                            roomRef.child('players').once('value', s => {
+                                if(Object.values(s.val()).every(p => p.vote)) { clearInterval(i); calculateScores(s.val(), data.oddOneId); }
+                            });
+                        }, 1000);
+                    }
+                };
+                list.appendChild(btn);
+            });
+        }
+
+        function calculateScores(players, oddId) {
+            const ids = Object.keys(players);
+            const updates = {};
+            ids.forEach(id => {
+                let pts = (id === oddId) ? ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length : (players[id].vote === oddId ? 1 : 0);
+                if (pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
+            });
+            updates.gameState = "RESULTS";
+            roomRef.update(updates);
+        }
+
+        function resetInputUI() {
+            document.getElementById('answer-input').value = "";
+            document.getElementById('submit-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('waiting-msg').classList.add('hidden');
+            document.getElementById('word-count-label').innerText = "Words: 0 / 5";
+        }
+
+        function updateScoreboard(players) {
+            document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => (b.score||0)-(a.score||0)).map(p => `
+                <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
+                    <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
+                    <div class="text-xl font-black">${p.score || 0}</div>
+                </div>
+            `).join('');
+        }
+
+        function showScreen(id) {
+            ['screen-lobby','screen-input','screen-voting','screen-results'].forEach(s => document.getElementById(s).classList.add('hidden-screen'));
+            document.getElementById(id).classList.remove('hidden-screen');
+            document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
+        }
+
+        function handleNextRound() { roomRef.once('value', s => { if(localPlayer.id === s.val().hostId) hostStartGame(); }); }
+        lucide.createIcons();
     </script>
 </body>
 </html>
