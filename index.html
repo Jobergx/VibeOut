@@ -80,137 +80,115 @@ const firebaseConfig = {
     appId: "1:784876378174:web:dec7a58f1013cb593b596f"
 };
 
-function setStatus(msg, color = "text-slate-400") {
-    const log = document.getElementById('debug-log');
-    if (log) {
-        log.innerText = "Status: " + msg;
-        log.className = `fixed top-0 left-0 w-full bg-slate-800 text-[10px] p-1 z-[100] font-mono text-center border-b border-slate-700 ${color}`;
-    }
+// Persistent ID so refresh doesn't kill your Host status
+if(!localStorage.getItem('vibe_uid')) {
+    localStorage.setItem('vibe_uid', 'p_' + Math.random().toString(36).substr(2, 9));
 }
-
-// Initialize
-firebase.initializeApp(firebaseConfig);
-var db = firebase.database();
-
-db.ref(".info/connected").on("value", (snap) => {
-    if (snap.val() === true) setStatus("Online: Europe Server Connected", "text-[#3b82f6]");
-    else setStatus("Connecting...", "text-amber-500");
-});
-
-// --- 2. GAME DATA ---
-const prompts = [
-    {g:"A Hospital",o:"A Hotel"},{g:"Library",o:"Museum"},
-    {g:"Pizza",o:"Taco"},{g:"Elephant",o:"Dino"},
-    {g:"Coffee",o:"Energy Drink"}
-];
-
-// We use a more stable ID generation
 let localPlayer = { 
-    id: 'p_' + Math.random().toString(36).substr(2, 9), 
+    id: localStorage.getItem('vibe_uid'), 
     name: "", 
     isHost: false 
 };
-let currentRoomCode = null;
+
+firebase.initializeApp(firebaseConfig);
+var db = firebase.database();
 let roomRef = null;
 
-// --- 3. ENTRY LOGIC ---
+// --- 2. ENTRY LOGIC ---
 
 function joinOrCreateRoom() {
     const name = document.getElementById('player-name').value.trim().toUpperCase();
     let code = document.getElementById('room-input').value.trim().toUpperCase();
-    if (!name) return alert("Enter your name!");
+    if (!name) return alert("Name required!");
     
     localPlayer.name = name;
-    const btn = document.getElementById('entry-btn');
-    btn.disabled = true;
-    btn.innerText = "SYNCING...";
+    document.getElementById('entry-btn').innerText = "CONNECTING...";
 
     if (!code) {
-        // --- HOSTING ---
+        // HOSTING
         const newCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-        currentRoomCode = newCode;
         localPlayer.isHost = true;
-        
         db.ref('rooms/' + newCode).set({
             gameState: "LOBBY",
             hostId: localPlayer.id,
             createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => setupPlayerInRoom(newCode));
+        }).then(() => setupGame(newCode));
     } else {
-        // --- JOINING ---
+        // JOINING
         db.ref('rooms/' + code).once('value', snap => {
             if (snap.exists()) {
-                currentRoomCode = code;
-                localPlayer.isHost = false; // Ensure joining players aren't hosts
-                setupPlayerInRoom(code);
+                localPlayer.isHost = (snap.val().hostId === localPlayer.id);
+                setupGame(code);
             } else {
                 alert("Room not found!");
-                btn.disabled = false;
-                btn.innerText = "ENTER GAME";
+                document.getElementById('entry-btn').innerText = "ENTER GAME";
             }
         });
     }
 }
 
-function setupPlayerInRoom(code) {
+function setupGame(code) {
     roomRef = db.ref('rooms/' + code);
-    
-    // Add player
-    roomRef.child('players/' + localPlayer.id).set({
+    roomRef.child('players/' + localPlayer.id).update({
         id: localPlayer.id,
         name: localPlayer.name,
         score: 0,
-        isHost: localPlayer.isHost,
-        answer: "",
-        vote: ""
-    }).then(() => {
-        document.getElementById('entry-form').classList.add('hidden');
-        document.getElementById('waiting-area').classList.remove('hidden');
-        document.getElementById('room-code-display').innerText = code;
-        
-        // Start Global Listener
-        roomRef.on('value', snap => {
-            const data = snap.val();
-            if (data) syncUI(data);
-        });
+        isHost: localPlayer.isHost
     });
 
     roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
+    
+    document.getElementById('entry-form').classList.add('hidden');
+    document.getElementById('waiting-area').classList.remove('hidden');
+    document.getElementById('room-code-display').innerText = code;
+
+    roomRef.on('value', snap => {
+        const data = snap.val();
+        if (data) renderUI(data);
+    });
 }
 
-function syncUI(data) {
+function renderUI(data) {
     const players = data.players ? Object.values(data.players) : [];
     const count = players.length;
     
-    // 1. Update Lobby UI
+    // Update Lobby List
     document.getElementById('current-count').innerText = count;
     document.getElementById('lobby-player-list').innerHTML = players.map(p => `
         <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
-            ${p.name} ${p.isHost ? '👑' : ''}
+            ${p.name} ${p.id === data.hostId ? '👑' : ''}
         </div>
     `).join('');
 
-    // 2. Logic to Show Start Button
-    // We check if WE are the host AND there are 3 or more players
-    const amIHost = data.hostId === localPlayer.id || localPlayer.isHost;
+    // --- THE FIX: Host Detection ---
     const startBtn = document.getElementById('host-start-btn');
     const note = document.getElementById('min-players-note');
+    
+    // You are host if your ID matches the hostId in the database
+    const isMeHost = (data.hostId === localPlayer.id);
 
-    if (amIHost && count >= 3) {
+    if (isMeHost) {
         startBtn.classList.remove('hidden');
-        note.classList.add('hidden');
-    } else {
-        startBtn.classList.add('hidden');
-        note.classList.remove('hidden');
+        // Disable start if under 3 players, but show the button so you know you're host
+        if (count >= 3) {
+            startBtn.disabled = false;
+            startBtn.innerText = "START GAME";
+            startBtn.style.opacity = "1";
+            note.classList.add('hidden');
+        } else {
+            startBtn.disabled = true;
+            startBtn.innerText = "WAITING FOR 3...";
+            startBtn.style.opacity = "0.5";
+            note.classList.remove('hidden');
+        }
     }
 
-    // 3. Screen Switching
+    // State Manager
     const state = data.gameState || "LOBBY";
     if (state === "LOBBY") showScreen('screen-lobby');
     if (state === "INPUT") {
         const isOdd = localPlayer.id === data.oddOneId;
-        const promptObj = data.currentPrompt;
-        document.getElementById('prompt-text').innerText = `Describe ${isOdd ? promptObj.o : promptObj.g} in exactly 5 words.`;
+        document.getElementById('prompt-text').innerText = `Describe ${isOdd ? data.currentPrompt.o : data.currentPrompt.g} in 5 words.`;
         showScreen('screen-input');
     }
     if (state === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
@@ -221,50 +199,44 @@ function syncUI(data) {
     updateScoreboard(players);
 }
 
-// --- 4. GAME ENGINE ---
+// --- 3. GAME ACTIONS ---
 
 function hostStartGame() {
     roomRef.child('players').once('value', snap => {
-        const pData = snap.val();
-        const ids = Object.keys(pData);
-        const pair = prompts[Math.floor(Math.random() * prompts.length)];
-        const oddId = ids[Math.floor(Math.random() * ids.length)];
+        const pObj = snap.val();
+        const ids = Object.keys(pObj);
+        const pair = [{g:"Coffee",o:"Tea"},{g:"Pizza",o:"Taco"},{g:"Dog",o:"Wolf"}][Math.floor(Math.random() * 3)];
         
-        const updates = {};
-        ids.forEach(id => {
-            updates[`players/${id}/answer`] = "";
-            updates[`players/${id}/vote`] = "";
+        roomRef.update({
+            gameState: "INPUT",
+            currentPrompt: pair,
+            oddOneId: ids[Math.floor(Math.random() * ids.length)],
+            shuffled: ids.sort(() => Math.random() - 0.5)
         });
-        updates.gameState = "INPUT";
-        updates.currentPrompt = pair;
-        updates.oddOneId = oddId;
-        updates.shuffled = ids.sort(() => Math.random() - 0.5);
-        roomRef.update(updates);
     });
 }
 
 function validateInput() {
-    const text = document.getElementById('answer-input').value.trim();
-    const words = text === "" ? [] : text.split(/\s+/);
+    const words = document.getElementById('answer-input').value.trim().split(/\s+/);
     const btn = document.getElementById('submit-btn');
-    document.getElementById('word-count-label').innerText = `Words: ${words.length} / 5`;
-    btn.disabled = words.length !== 5;
-    btn.style.opacity = words.length === 5 ? "1" : "0.5";
+    const isValid = words.length === 5 && words[0] !== "";
+    btn.disabled = !isValid;
+    btn.style.opacity = isValid ? "1" : "0.5";
+    document.getElementById('word-count-label').innerText = `Words: ${words[0] === "" ? 0 : words.length} / 5`;
 }
 
 function submitAnswer() {
-    const text = document.getElementById('answer-input').value.trim();
-    roomRef.child('players/' + localPlayer.id).update({ answer: text });
+    roomRef.child('players/' + localPlayer.id).update({ answer: document.getElementById('answer-input').value.trim() });
     document.getElementById('submit-btn').classList.add('hidden');
     
-    // Host checks if all submitted
-    roomRef.child('players').on('value', snap => {
-        const players = Object.values(snap.val());
-        if (players.every(p => p.answer !== "")) {
-            roomRef.child('players').off('value');
-            roomRef.update({ gameState: "VOTING" });
-        }
-    });
+    if (localPlayer.isHost) {
+        roomRef.child('players').on('value', snap => {
+            if (Object.values(snap.val()).every(p => p.answer)) {
+                roomRef.child('players').off('value');
+                roomRef.update({ gameState: "VOTING" });
+            }
+        });
+    }
 }
 
 function renderVoting(data) {
@@ -273,44 +245,18 @@ function renderVoting(data) {
     data.shuffled.forEach(id => {
         const p = data.players[id];
         const btn = document.createElement('button');
-        btn.className = "w-full bg-slate-800/60 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
+        btn.className = "w-full bg-slate-800 p-4 rounded-2xl text-left border border-slate-700 mb-2";
         btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
         btn.onclick = () => {
             roomRef.child('players/' + localPlayer.id).update({ vote: id });
-            list.innerHTML = `<p class="text-center italic mt-10">Vote Cast. Waiting...</p>`;
-            
-            // Check if voting done
-            roomRef.child('players').on('value', snap => {
-                const players = Object.values(snap.val());
-                if (players.every(p => p.vote !== "")) {
-                    roomRef.child('players').off('value');
-                    if (localPlayer.isHost) calculateScores(snap.val(), data.oddOneId);
-                }
-            });
+            list.innerHTML = "<p class='text-center mt-10'>Vote cast...</p>";
         };
         list.appendChild(btn);
     });
 }
 
-function calculateScores(playersObj, oddId) {
-    const ids = Object.keys(playersObj);
-    const updates = {};
-    ids.forEach(id => {
-        let pts = 0;
-        if (id === oddId) {
-            const wrong = ids.filter(pid => pid !== oddId && playersObj[pid].vote !== oddId).length;
-            pts = wrong;
-        } else if (playersObj[id].vote === oddId) {
-            pts = 1;
-        }
-        if (pts > 0) updates[`players/${id}/score`] = (playersObj[id].score || 0) + pts;
-    });
-    updates.gameState = "RESULTS";
-    roomRef.update(updates);
-}
-
 function updateScoreboard(players) {
-    document.getElementById('scoreboard-list').innerHTML = players.sort((a,b) => b.score - a.score).map(p => `
+    document.getElementById('scoreboard-list').innerHTML = players.map(p => `
         <div class="px-4 border-r border-slate-800 text-center min-w-[70px]">
             <div class="text-[8px] text-slate-500 uppercase">${p.name}</div>
             <div class="text-xl font-black">${p.score || 0}</div>
@@ -323,8 +269,6 @@ function showScreen(id) {
     document.getElementById(id).classList.remove('hidden-screen');
     document.getElementById('game-header').classList.toggle('hidden', id === 'screen-lobby');
 }
-
-function handleNextRound() { if(localPlayer.isHost) hostStartGame(); }
 
 lucide.createIcons();
     </script>
