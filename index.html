@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VibeOut | Social Deduction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
+
+    body {
+      font-family: 'Space+Grotesk', sans-serif;
+      background-color: #0f172a;
+      color: white;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .hidden-screen {
+      display: none;
+    }
+
+    .screen-fade {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(5px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+
+<body class="h-screen overflow-hidden flex flex-col">
+
+  <header id="game-header"
+    class="hidden p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+    <div class="flex gap-2 overflow-x-auto no-scrollbar" id="scoreboard-list"></div>
+    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">VibeOut</div>
+  </header>
+
+  <main class="flex-grow overflow-y-auto p-6 flex flex-col items-center justify-center">
+
+    <section id="screen-lobby" class="screen-fade w-full max-w-md text-center">
+      <h1 class="text-6xl font-bold mb-2 tracking-tighter italic">
+        <span class="text-[#3b82f6]">Vibe</span><span class="text-white">Out</span>
+      </h1>
+
+      <div id="entry-form" class="bg-slate-800/50 p-6 rounded-3xl border border-slate-700 mb-6">
+        <input id="player-name" type="text" placeholder="YOUR NAME"
+          class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-bold mb-3 outline-none focus:ring-2 focus:ring-[#3b82f6]">
+        <input id="room-input" type="text" placeholder="ROOM CODE (LEAVE BLANK TO HOST)"
+          class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-mono mb-4 outline-none focus:ring-2 focus:ring-[#3b82f6]">
+        <button onclick="joinOrCreateRoom()"
+          class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl">ENTER GAME</button>
+      </div>
+
+      <div id="waiting-area" class="hidden screen-fade bg-slate-800/50 p-6 rounded-3xl border border-slate-700 mb-6">
+        <div class="text-[10px] text-slate-500 uppercase mb-1 font-bold">Room Code</div>
+        <div id="room-code-display" class="text-4xl font-mono font-bold tracking-widest text-white mb-4">----</div>
+        <div class="text-xs font-bold text-slate-400 uppercase mb-4">Players: <span id="current-count"
+            class="text-white">0</span> / 4</div>
+        <div id="lobby-player-list" class="flex flex-wrap justify-center gap-2"></div>
+      </div>
+
+      <button id="host-start-btn" onclick="hostStartGame()"
+        class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl">START GAME</button>
+    </section>
+
+    <section id="screen-input" class="hidden-screen screen-fade w-full max-w-md">
+      <div class="border-2 border-[#3b82f6]/30 bg-slate-900 p-6 rounded-3xl mb-6">
+        <h2 class="text-[#3b82f6] text-xs font-bold uppercase mb-2">Your Task</h2>
+        <p id="prompt-text" class="text-2xl font-bold leading-tight">Describe the prompt in exactly 5 words.</p>
+      </div>
+
+      <textarea id="answer-input" oninput="validateInput()" placeholder="Type your response here..."
+        class="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-lg focus:ring-2 focus:ring-[#3b82f6] outline-none mb-2 h-32 resize-none"></textarea>
+
+      <div class="flex justify-between items-center mb-4 px-2">
+        <span id="word-count-label" class="text-xs font-bold text-slate-500 uppercase">Words: 0 / 5</span>
+        <span id="error-msg" class="text-xs font-bold text-red-500 uppercase hidden">Exactly 5 words!</span>
+      </div>
+
+      <button onclick="submitAnswer()"
+        class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl active:scale-95 transition-all opacity-50"
+        disabled>
+        SUBMIT VIBE
+      </button>
+    </section>
+
+    <section id="screen-voting" class="hidden-screen screen-fade w-full max-w-md">
+      <h2 class="text-center text-xl font-bold mb-6">Who is the <span class="text-[#f59e0b]">Odd One Out?</span></h2>
+      <div id="voting-list" class="flex flex-col gap-4"></div>
+    </section>
+
+    <section id="screen-results" class="hidden-screen screen-fade w-full max-w-md text-center">
+      <div class="mb-8">
+        <h2 class="text-slate-400 text-sm font-bold mb-2 uppercase tracking-widest">The Odd One was...</h2>
+        <div id="revealed-name" class="text-5xl font-black text-[#f59e0b] uppercase">ALEX</div>
+      </div>
+
+      <div class="bg-slate-800/50 p-6 rounded-3xl mb-8 border border-slate-700">
+        <h3 class="text-slate-400 mb-4 text-xs font-bold uppercase">Round Scores</h3>
+        <div id="round-results-list" class="space-y-2 text-sm"></div>
+      </div>
+
+      <button onclick="handleNextAction()" id="play-btn"
+        class="w-full bg-white text-black font-bold py-4 rounded-2xl text-xl uppercase">
+        Next Round
+      </button>
+    </section>
+
+  </main>
+
+  <div id="ad-overlay"
+    class="hidden fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-center p-10">
+    <div class="w-16 h-16 border-4 border-[#3b82f6] border-t-transparent rounded-full animate-spin mb-6"></div>
+    <h2 class="text-2xl font-bold mb-2 uppercase">Sponsor Content</h2>
+    <p class="text-slate-400 mb-8">Tournament reset in <span id="ad-timer" class="text-white font-bold">5</span>
+      seconds...</p>
+    <div
+      class="bg-slate-900 w-full aspect-video rounded-xl flex items-center justify-center italic text-slate-700 border border-slate-800">
+      [ Video Ad ]
+    </div>
+  </div>
+
+  <script>
+    // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyA50JXsizLFn9MGGIByyw6PU4yHZ5ub3dw",
+  authDomain: "vibeout-d814c.firebaseapp.com",
+  projectId: "vibeout-d814c",
+  storageBucket: "vibeout-d814c.firebasestorage.app",
+  messagingSenderId: "784876378174",
+  appId: "1:784876378174:web:dec7a58f1013cb593b596f",
+  measurementId: "G-3MGPL9LNF6"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+    
+
+    // --- 2. GAME CONSTANTS & STATE ---
+    const promptPairs = [
+      { group: "A Hospital", odd: "A Hotel" },
+      { group: "A Library", odd: "A Museum" },
+      { group: "Pizza", odd: "A Taco" },
+      { group: "An Elephant", odd: "A Dinosaur" },
+      { group: "Coffee", odd: "An Energy Drink" }
+    ];
+
+    let localPlayer = { id: Date.now().toString(), name: "", isHost: false, score: 0 };
+    let currentRoomCode = null;
+    let roomRef = null;
+
+    // --- 3. ROOM LOGIC ---
+
+    function joinOrCreateRoom() {
+      const nameInput = document.getElementById('player-name').value.trim().toUpperCase();
+      let codeInput = document.getElementById('room-input').value.trim().toUpperCase();
+
+      if (!nameInput) return alert("Please enter a name");
+      localPlayer.name = nameInput;
+
+      if (!codeInput) {
+        // HOSTING: Create new room
+        codeInput = Math.random().toString(36).substring(2, 6).toUpperCase();
+        localPlayer.isHost = true;
+        setupRoom(codeInput);
+      } else {
+        // JOINING: Check if exists
+        db.ref('rooms/' + codeInput).once('value', snapshot => {
+          if (snapshot.exists()) {
+            setupRoom(codeInput);
+          } else {
+            alert("Room not found!");
+          }
+        });
+      }
+    }
+
+    function setupRoom(code) {
+      currentRoomCode = code;
+      roomRef = db.ref('rooms/' + code);
+
+      // Add me to players
+      roomRef.child('players/' + localPlayer.id).set({
+        name: localPlayer.name,
+        score: 0,
+        isHost: localPlayer.isHost,
+        answer: "",
+        vote: ""
+      });
+
+      // Remove me when I disconnect
+      roomRef.child('players/' + localPlayer.id).onDisconnect().remove();
+
+      // Hide entry form, show waiting area
+      document.getElementById('entry-form').classList.add('hidden');
+      document.getElementById('waiting-area').classList.remove('hidden');
+      document.getElementById('room-code-display').innerText = code;
+
+      listenToRoomUpdates();
+    }
+
+    function listenToRoomUpdates() {
+      roomRef.on('value', snapshot => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        // 1. Sync Players & Lobby
+        const players = data.players ? Object.values(data.players) : [];
+        updateLobbyUI(players);
+
+        // 2. Sync Game Screen
+        handleGameStateSync(data);
+      });
+    }
+
+    function updateLobbyUI(players) {
+      document.getElementById('current-count').innerText = players.length;
+      const list = document.getElementById('lobby-player-list');
+      list.innerHTML = players.map(p => `
+        <div class="${p.name === localPlayer.name ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">${p.name}</div>
+    `).join('');
+
+      // Only host sees start button
+      if (localPlayer.isHost && players.length >= 3) {
+        document.getElementById('host-start-btn').classList.remove('hidden');
+      }
+    }
+
+    // --- 4. GAME ENGINE SYNC ---
+
+    function handleGameStateSync(data) {
+      const state = data.gameState || "LOBBY";
+
+      // Trigger screen changes
+      if (state === "LOBBY") showScreen('screen-lobby');
+
+      if (state === "INPUT") {
+        const myData = data.players[localPlayer.id];
+        const isOdd = localPlayer.id === data.oddOneId;
+        const prompt = isOdd ? data.currentPrompt.odd : data.currentPrompt.group;
+
+        document.getElementById('prompt-text').innerText = `Describe ${prompt} in exactly 5 words.`;
+        if (myData.answer === "") showScreen('screen-input');
+        else showScreen('screen-input'); // You'll see "waiting" logic handled below
+      }
+
+      if (state === "VOTING") {
+        if (!document.getElementById('voting-list').hasChildNodes()) {
+          renderVotingList(data);
+        }
+        showScreen('screen-voting');
+      }
+
+      if (state === "RESULTS") {
+        if ("vibrate" in navigator) navigator.vibrate(200);
+        renderResults(data);
+        showScreen('screen-results');
+      }
+    }
+
+    // --- 5. ACTION FUNCTIONS ---
+
+    function hostStartGame() {
+      const pair = promptPairs[Math.floor(Math.random() * promptPairs.length)];
+      const pIds = Object.keys((localPlayer.id)); // Need actual keys from DB
+      roomRef.child('players').once('value', snap => {
+        const ids = Object.keys(snap.val());
+        const oddId = ids[Math.floor(Math.random() * ids.length)];
+
+        roomRef.update({
+          gameState: "INPUT",
+          currentPrompt: pair,
+          oddOneId: oddId,
+          shuffledOrder: ids.sort(() => Math.random() - 0.5) // Shared shuffle
+        });
+      });
+    }
+
+    function validateInput() {
+      const text = document.getElementById('answer-input').value.trim();
+      const count = text === "" ? 0 : text.split(/\s+/).length;
+      const btn = document.querySelector('#screen-input button');
+      document.getElementById('word-count-label').innerText = `Words: ${count} / 5`;
+      btn.disabled = count !== 5;
+      btn.style.opacity = count === 5 ? "1" : "0.5";
+    }
+
+    function submitAnswer() {
+      const text = document.getElementById('answer-input').value.trim();
+      roomRef.child('players/' + localPlayer.id).update({ answer: text });
+
+      // Show waiting message
+      document.getElementById('screen-input').innerHTML = `<h2 class="text-xl font-bold text-center">Vibe Received.<br><span class="text-[#3b82f6]">Waiting for others...</span></h2>`;
+
+      // Host checks if everyone is done
+      if (localPlayer.isHost) {
+        checkAllAnswersSubmitted();
+      }
+    }
+
+    function checkAllAnswersSubmitted() {
+      roomRef.child('players').once('value', snap => {
+        const players = Object.values(snap.val());
+        if (players.every(p => p.answer !== "")) {
+          roomRef.update({ gameState: "VOTING" });
+        }
+      });
+    }
+
+    function renderVotingList(data) {
+      const list = document.getElementById('voting-list');
+      list.innerHTML = "";
+
+      data.shuffledOrder.forEach(pId => {
+        const p = data.players[pId];
+        const btn = document.createElement('button');
+        btn.className = "w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl text-left flex flex-col gap-1 active:scale-95";
+        btn.innerHTML = `<span class="text-[10px] font-bold text-slate-500 uppercase">${p.name}</span><p class="text-lg text-white italic">"${p.answer}"</p>`;
+
+        btn.onclick = () => {
+          roomRef.child('players/' + localPlayer.id).update({ vote: pId });
+          list.innerHTML = `<h2 class="text-xl font-bold text-center">Vote Cast.<br><span class="text-[#f59e0b]">Waiting for results...</span></h2>`;
+          if (localPlayer.isHost) checkAllVotesCast();
+        };
+        list.appendChild(btn);
+      });
+    }
+
+    function checkAllVotesCast() {
+      roomRef.child('players').once('value', snap => {
+        const players = Object.values(snap.val());
+        if (players.every(p => p.vote !== "")) {
+          calculateScoresAndEndRound(snap.val());
+        }
+      });
+    }
+
+    function calculateScoresAndEndRound(playersData) {
+      const ids = Object.keys(playersData);
+      const oddId = ids.find(id => playersData[id].isOddOne); // This needs to match the oddOneId in DB
+
+      // Basic scoring logic sync
+      // (In a production app, the host would iterate and update each player's score ref)
+      roomRef.update({ gameState: "RESULTS" });
+    }
+
+    function showScreen(id) {
+      ['screen-lobby', 'screen-input', 'screen-voting', 'screen-results'].forEach(s => {
+        const el = document.getElementById(s);
+        if (el) el.classList.add('hidden-screen');
+      });
+      document.getElementById(id).classList.remove('hidden-screen');
+      const header = document.getElementById('game-header');
+      id === 'screen-lobby' ? header.classList.add('hidden') : header.classList.remove('hidden');
+    }
+
+    lucide.createIcons();
+  </script>
+</body>
+
+</html>
