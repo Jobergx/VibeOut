@@ -32,7 +32,7 @@
             <div id="entry-form" class="bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6 shadow-2xl">
                 <input id="player-name" type="text" placeholder="YOUR NAME" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-bold mb-3 outline-none">
                 <input id="room-input" type="text" placeholder="ROOM CODE" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-white text-center font-mono mb-4 outline-none">
-                <button id="entry-btn" onclick="joinOrCreateRoom()" class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl shadow-lg">ENTER GAME</button>
+                <button id="entry-btn" onclick="joinOrCreateRoom()" class="w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl shadow-lg active:scale-95 transition-transform">ENTER GAME</button>
             </div>
 
             <div id="waiting-area" class="hidden screen-fade bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6">
@@ -150,7 +150,6 @@
             const isMeHost = (data.hostId === localPlayer.id);
 
             // Lobby List
-            document.getElementById('current-count').innerText = count;
             document.getElementById('lobby-player-list').innerHTML = players.map(p => `
                 <div class="${p.id === localPlayer.id ? 'bg-[#3b82f6]' : 'bg-slate-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
                     ${p.name} ${p.id === data.hostId ? '👑' : ''}
@@ -195,7 +194,7 @@
                 if(newState === "VOTING") { renderVoting(data); showScreen('screen-voting'); }
                 if(newState === "RESULTS") {
                     const oddP = data.players[data.oddOneId];
-                    document.getElementById('revealed-name').innerText = oddP ? oddP.name : "Unknown";
+                    document.getElementById('revealed-name').innerText = (oddP && oddP.name) ? oddP.name : "Unknown";
                     showScreen('screen-results');
                 }
             }
@@ -214,11 +213,14 @@
             roomRef.child('players').once('value', snap => {
                 const ids = Object.keys(snap.val());
                 const updates = {};
-                ids.forEach(id => { updates[`players/${id}/answer`] = ""; updates[`players/${id}/vote`] = ""; });
+                ids.forEach(id => { 
+                    updates[`players/${id}/answer`] = ""; 
+                    updates[`players/${id}/vote`] = ""; 
+                });
                 updates.gameState = "INPUT";
                 updates.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
                 updates.oddOneId = ids[Math.floor(Math.random() * ids.length)];
-                updates.shuffled = ids.sort(() => Math.random() - 0.5);
+                updates.shuffled = [...ids].sort(() => Math.random() - 0.5);
                 roomRef.update(updates);
             });
         }
@@ -238,15 +240,16 @@
             document.getElementById('submit-btn').classList.add('hidden');
             document.getElementById('waiting-msg').classList.remove('hidden');
 
-            roomRef.once('value', s => {
-                if(s.val().hostId === localPlayer.id) {
-                    const i = setInterval(() => {
-                        roomRef.child('players').once('value', ps => {
-                            if(Object.values(ps.val()).every(p => p.answer !== "")) {
-                                clearInterval(i);
+            roomRef.child('hostId').once('value', hostSnap => {
+                if(hostSnap.val() === localPlayer.id) {
+                    const checkInterval = setInterval(() => {
+                        roomRef.child('players').once('value', playersSnap => {
+                            const players = playersSnap.val();
+                            if(players && Object.values(players).every(p => p.answer && p.answer.trim() !== "")) {
+                                clearInterval(checkInterval);
                                 roomRef.update({ gameState: "VOTING" });
                             }
-                        });
+                        }).catch(() => clearInterval(checkInterval));
                     }, 1000);
                 }
             });
@@ -255,39 +258,44 @@
         function renderVoting(data) {
             const list = document.getElementById('voting-list');
             list.innerHTML = "";
-            data.shuffled.forEach(id => {
-                if(id === localPlayer.id) return;
-                const p = data.players[id];
-                const btn = document.createElement('button');
-                btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
-                btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
-                btn.onclick = () => {
-                    roomRef.child('players/' + localPlayer.id).update({ vote: id });
-                    list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
-                    if(data.hostId === localPlayer.id) {
-                        const i = setInterval(() => {
-                            roomRef.child('players').once('value', s => {
-                                if(Object.values(s.val()).every(p => p.vote !== "")) {
-                                    clearInterval(i);
-                                    calculateScores(s.val(), data.oddOneId);
-                                }
-                            });
-                        }, 1000);
-                    }
-                };
-                list.appendChild(btn);
-            });
+            if(data.shuffled) {
+                data.shuffled.forEach(id => {
+                    if(id === localPlayer.id) return;
+                    const p = data.players[id];
+                    if(!p) return;
+                    const btn = document.createElement('button');
+                    btn.className = "w-full bg-slate-800 p-5 rounded-2xl text-left border border-slate-700 active:scale-95 transition-all mb-2";
+                    btn.innerHTML = `<span class="text-[9px] text-slate-500 uppercase">${p.name}</span><p class="text-white italic">"${p.answer}"</p>`;
+                    btn.onclick = () => {
+                        roomRef.child('players/' + localPlayer.id).update({ vote: id });
+                        list.innerHTML = "<p class='text-center italic mt-10'>Vote Cast. Waiting...</p>";
+                        if(data.hostId === localPlayer.id) {
+                            const checkVotes = setInterval(() => {
+                                roomRef.child('players').once('value', s => {
+                                    const players = s.val();
+                                    if(players && Object.values(players).every(p => p.vote && p.vote !== "")) {
+                                        clearInterval(checkVotes);
+                                        calculateScores(players, data.oddOneId);
+                                    }
+                                }).catch(() => clearInterval(checkVotes));
+                            }, 1000);
+                        }
+                    };
+                    list.appendChild(btn);
+                });
+            }
         }
 
         function calculateScores(players, oddId) {
             const ids = Object.keys(players);
             const updates = {};
             ids.forEach(id => {
+                const p = players[id];
                 let pts = 0;
                 if(id === oddId) {
-                    pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length;
-                } else if(players[id].vote === oddId) {
-                    pts = 1;
+                    pts = ids.filter(pid => pid !== oddId && players[pid].vote !== oddId).length * 2;
+                } else if(p.vote === oddId) {
+                    pts = 10;
                 }
                 if(pts > 0) updates[`players/${id}/score`] = (players[id].score || 0) + pts;
             });
