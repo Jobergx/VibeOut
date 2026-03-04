@@ -43,13 +43,19 @@
             </div>
 
             <div id="waiting-area" class="hidden screen-fade bg-slate-800/40 p-6 rounded-3xl border border-slate-700 mb-6">
-                <div class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Room Code</div>
-                <div id="room-code-display" class="text-4xl font-mono font-bold tracking-widest text-white mb-4">----</div>
-                <div class="text-xs font-bold text-slate-400 uppercase mb-4">Players: <span id="current-count" class="text-[#3b82f6]">0</span> / 4</div>
-                <div id="lobby-player-list" class="flex flex-wrap justify-center gap-2 mb-4"></div>
-                <button id="host-start-btn" onclick="hostStartGame()" class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl shadow-lg shadow-blue-900/20">START GAME</button>
-                <p id="min-players-note" class="text-[10px] text-amber-500 font-bold uppercase mt-2">Waiting for at least 3 players...</p>
-            </div>
+              <div class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Room Code</div>
+              <div class="flex items-center justify-center gap-3 mb-4">
+                  <div id="room-code-display" class="text-4xl font-mono font-bold tracking-widest text-[#3b82f6]">----</div>
+                  <button onclick="copyRoomLink()" class="p-2 bg-slate-700 rounded-full hover:bg-slate-600 transition-all active:scale-90">
+                      <i data-lucide="share-2" class="w-4 h-4 text-white"></i>
+                  </button>
+              </div>
+              <div class="text-xs font-bold text-slate-400 uppercase mb-4">Players: <span id="current-count" class="text-[#3b82f6]">0</span> / 4</div>
+              <div id="lobby-player-list" class="flex flex-wrap justify-center gap-2 mb-4"></div>
+              
+              <button id="host-start-btn" onclick="hostStartGame()" class="hidden w-full bg-[#3b82f6] text-white font-bold py-4 rounded-2xl text-xl shadow-lg shadow-blue-900/20">START GAME</button>
+              <p id="min-players-note" class="text-[10px] text-amber-500 font-bold uppercase mt-2">Waiting for at least 3 players...</p>
+          </div>
         </section>
 
         <section id="screen-input" class="hidden-screen screen-fade w-full max-w-md">
@@ -285,6 +291,32 @@
         }
 
         lucide.createIcons();
+        window.onload = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromUrl = urlParams.get('room');
+    if (roomFromUrl) {
+        document.getElementById('room-input').value = roomFromUrl.toUpperCase();
+        // Visual cue that they are joining a specific room
+        document.getElementById('room-input').classList.add('border-[#3b82f6]');
+    }
+};
+function copyRoomLink() {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const fullUrl = `${baseUrl}?room=${currentRoomCode}`;
+    
+    navigator.clipboard.writeText(fullUrl).then(() => {
+        // Simple visual feedback
+        const btn = document.querySelector('[onclick="copyRoomLink()"]');
+        const originalInner = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-[#3b82f6]"></i>';
+        lucide.createIcons();
+        
+        setTimeout(() => {
+            btn.innerHTML = originalInner;
+            lucide.createIcons();
+        }, 2000);
+    });
+}
     </script>
 </body>
 </html>
